@@ -10,6 +10,7 @@
 //! | release      | bump version, commit, tag, push, create GH release        |
 //! | detect-changes | classify changed paths, emit GHA outputs               |
 //! | ci-watch     | watch latest GHA run with job-level detail                |
+//! | land         | fetch + rebase onto main + CI gate + push (merge queue)   |
 
 use anyhow::{Result, bail};
 use std::env;
@@ -19,6 +20,7 @@ mod bump;
 mod ci_watch;
 mod detect_changes;
 mod gates;
+mod land;
 mod publish;
 mod release;
 mod rustqual;
@@ -64,6 +66,7 @@ fn main() -> Result<()> {
                 .unwrap_or_else(|| "origin/main".to_string());
             detect_changes::run(&root, &base)
         }
+        Some("land") => land::land(&sh),
         Some("ci-watch") => {
             let branch = {
                 let args: Vec<String> = env::args().collect();
@@ -87,6 +90,7 @@ fn main() -> Result<()> {
             eprintln!("  release [patch|minor|major]  bump, tag, push, create GH release");
             eprintln!("  bump [patch|minor|major]     bump workspace version only");
             eprintln!("  ci-watch [--branch <branch>] watch latest GHA run");
+            eprintln!("  land                         fetch + rebase + CI gate + push");
             Ok(())
         }
     }
