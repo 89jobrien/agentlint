@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "allow": ["Bash"]
+  },
+  "unknownField": "this should error"
+}

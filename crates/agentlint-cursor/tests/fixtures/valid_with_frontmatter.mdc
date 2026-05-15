@@ -1,0 +1,6 @@
+---
+description: Enforce Rust conventions
+globs: "**/*.rs"
+alwaysApply: false
+---
+Always use `?` for error propagation. Never use `.unwrap()` in production code.
