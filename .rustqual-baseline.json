@@ -1,0 +1,38 @@
+{
+  "version": 2,
+  "quality_score": 0.8972860667445786,
+  "iosp_score": 0.9901960784313726,
+  "violations": 1,
+  "total": 151,
+  "complexity_warnings": 0,
+  "magic_number_warnings": 2,
+  "nesting_depth_warnings": 0,
+  "function_length_warnings": 0,
+  "unsafe_warnings": 0,
+  "error_handling_warnings": 1,
+  "duplicate_groups": 2,
+  "dead_code_warnings": 5,
+  "fragment_groups": 2,
+  "boilerplate_warnings": 0,
+  "srp_struct_warnings": 0,
+  "srp_module_warnings": 0,
+  "wildcard_import_warnings": 0,
+  "sdp_violations": 0,
+  "coupling_warnings": 0,
+  "coupling_cycles": 0,
+  "tq_no_assertion_warnings": 0,
+  "tq_no_sut_warnings": 0,
+  "tq_untested_warnings": 0,
+  "tq_uncovered_warnings": 0,
+  "tq_untested_logic_warnings": 0,
+  "structural_srp_warnings": 1,
+  "structural_coupling_warnings": 0,
+  "total_findings": 14,
+  "violation_details": [
+    {
+      "name": "glob_match_inner",
+      "file": "crates/agentlint-core/src/lib.rs",
+      "line": 202
+    }
+  ]
+}
