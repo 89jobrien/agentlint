@@ -18,7 +18,7 @@ use nom::{
     IResult,
     bytes::complete::take_while1,
     character::complete::{char, space0},
-    sequence::terminated,
+    sequence::{preceded, terminated},
 };
 use std::path::Path;
 
@@ -86,8 +86,9 @@ fn parse_field(line: &str, line_num: usize) -> Option<Field> {
         take_while1(|c: char| c.is_alphanumeric() || c == '-' || c == '_')(input)
     }
 
+    // Accept optional whitespace on both sides of the colon: `key : value`
     fn colon_sep(input: &str) -> IResult<&str, char> {
-        terminated(char(':'), space0)(input)
+        preceded(space0, terminated(char(':'), space0))(input)
     }
 
     let input = line.trim();
@@ -206,6 +207,16 @@ mod tests {
         assert_eq!(name.line, 3);
         let desc = fields.iter().find(|f| f.key == "description").unwrap();
         assert_eq!(desc.line, 4);
+    }
+
+    #[test]
+    fn parse_field_with_space_before_colon() {
+        // Regression: `key : value` (space before colon) must not be silently dropped.
+        let src = "---\nname : my-agent\ndescription: ok\n---\n";
+        let fields = parse(src).unwrap();
+        let name = fields.iter().find(|f| f.key == "name");
+        assert!(name.is_some(), "name field was silently dropped");
+        assert_eq!(name.unwrap().value, "my-agent");
     }
 
     #[test]

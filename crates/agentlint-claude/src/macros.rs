@@ -4,6 +4,21 @@
 //! parses YAML frontmatter and checks all `required` fields are present and
 //! non-empty. The actual parsing logic lives in [`crate::frontmatter`].
 //!
+//! # Design note — inherent fn, not `Validator` trait
+//!
+//! The generated method is `impl Type { pub fn validate(...) }` with **no `&self`
+//! receiver**. This means the generated type does **not** implement the
+//! [`agentlint_core::Validator`] trait and cannot be registered as
+//! `Box<dyn Validator>` directly.
+//!
+//! The intended dispatch path is:
+//! 1. `ClaudeValidator` implements `Validator` and is registered in `main.rs`.
+//! 2. `ClaudeValidator::validate` classifies the path and delegates to the
+//!    appropriate inherent `*Validator::validate` function.
+//!
+//! If a sub-validator ever needs direct `Box<dyn Validator>` registration, add a
+//! `&self` receiver to the generated method and a `impl Validator for $t` block.
+//!
 //! # Examples
 //!
 //! ```rust,ignore
