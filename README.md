@@ -108,7 +108,10 @@ Or with cargo:
 
 ## Development
 
-```
+```bash
+# First-time setup (configures git hooks, installs cargo tools)
+./scripts/dev-setup.sh
+
 cargo check --workspace
 cargo nextest run --workspace
 cargo clippy --workspace -- -D warnings
