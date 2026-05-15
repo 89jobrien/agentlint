@@ -12,7 +12,7 @@ pub fn release(sh: &Shell, root: &Path, level: &str) -> Result<()> {
 
     // 2. Read the new version.
     let manifest = std::fs::read_to_string(root.join("Cargo.toml"))?;
-    let version = parse_version(&manifest)
+    let version = crate::bump::parse_workspace_version(&manifest)
         .ok_or_else(|| anyhow::anyhow!("could not read version after bump"))?;
     let tag = format!("v{version}");
 
@@ -35,27 +35,4 @@ pub fn release(sh: &Shell, root: &Path, level: &str) -> Result<()> {
 
     eprintln!("released {tag}");
     Ok(())
-}
-
-fn parse_version(content: &str) -> Option<String> {
-    let mut in_section = false;
-    for line in content.lines() {
-        let t = line.trim();
-        if t == "[workspace.package]" {
-            in_section = true;
-            continue;
-        }
-        if in_section {
-            if t.starts_with('[') {
-                break;
-            }
-            if let Some(v) = t
-                .strip_prefix("version = \"")
-                .and_then(|v| v.strip_suffix('"'))
-            {
-                return Some(v.to_string());
-            }
-        }
-    }
-    None
 }

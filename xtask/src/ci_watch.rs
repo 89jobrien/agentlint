@@ -58,6 +58,8 @@ fn status_icon(conclusion: Option<&str>, status: &str) -> &'static str {
     }
 }
 
+const SECS_PER_MIN: i64 = 60;
+
 fn elapsed(started: &str, completed: &str) -> Option<String> {
     let s = DateTime::parse_from_rfc3339(started).ok()?;
     let e = DateTime::parse_from_rfc3339(completed).ok()?;
@@ -65,10 +67,10 @@ fn elapsed(started: &str, completed: &str) -> Option<String> {
     if secs <= 0 {
         return None;
     }
-    Some(if secs < 60 {
+    Some(if secs < SECS_PER_MIN {
         format!("{secs}s")
     } else {
-        format!("{}m{}s", secs / 60, secs % 60)
+        format!("{}m{}s", secs / SECS_PER_MIN, secs % SECS_PER_MIN)
     })
 }
 
