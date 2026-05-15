@@ -8,23 +8,128 @@ harness file formats.
 
 ## Architecture
 
-- Crates affected: `agentlint-cursor`, `agentlint-codex`, `agentlint-opencode`,
-  `agentlint-gemini`, `agentlint-pi`
-- New traits/types: none — each crate already has a `*Validator` struct implementing
-  `agentlint_core::Validator`
-- Data flow: `validate(path, src)` → `Vec<Diagnostic>` per crate
-- Shared pattern: "non-empty content" check reused across codex/gemini/pi/opencode;
-  Cursor has optional frontmatter parsing via the nom parser already in
-  `agentlint-claude::frontmatter` (exposed as pub or duplicated — see Task 1)
+Layer stack (lowest to highest):
+
+```
+agentlint (bin)               — composition root
+agentlint-{claude,cursor,...} — adapters, one struct per file-type concern
+agentlint-frontmatter         — shared YAML frontmatter parser utility
+agentlint-core                — primitives only: Diagnostic, Validator, run_on, run
+```
+
+Rules:
+
+- No adapter depends on another adapter crate.
+- `agentlint-core` has no parser logic — only the port trait and runner primitives.
+- `agentlint-frontmatter` has no validator logic — only parsing and field extraction.
+- Each `*Validator` struct owns exactly one file-type concern.
+- `validate(path, src)` receives pre-loaded content — no filesystem access inside
+  any validator.
+
+Crates affected: `agentlint-frontmatter` (new), `agentlint-core` (Cargo.toml: drop
+nom), `agentlint-claude` (use frontmatter crate), `agentlint-cursor`,
+`agentlint-codex`, `agentlint-opencode`, `agentlint-gemini`, `agentlint-pi`,
+`agentlint` (bin, Cargo.toml: add frontmatter if needed — likely not).
 
 ## Tech Stack
 
 - Rust edition 2024
-- `nom = "7"` — already in `agentlint-claude`; add to `agentlint-cursor`
-- `serde_json = "1"` — already in workspace; add to `agentlint-opencode`
+- `nom = "7"` — moves to `agentlint-frontmatter`
+- `serde_json = "1"` — stays in `agentlint-core` (format_json) and `agentlint-opencode`
 - `agentlint-core` test-utils feature for assertion helpers in dev-dependencies
 
+---
+
 ## Tasks
+
+### Task 0: Create agentlint-frontmatter crate
+
+**Crate**: `agentlint-frontmatter` (new), `agentlint-core`, `agentlint-claude`
+**File(s)**:
+
+- `crates/agentlint-frontmatter/Cargo.toml` (new)
+- `crates/agentlint-frontmatter/src/lib.rs` (new)
+- `Cargo.toml` (workspace: add member)
+- `crates/agentlint-core/Cargo.toml` (remove nom)
+- `crates/agentlint-claude/Cargo.toml` (replace nom with agentlint-frontmatter)
+- `crates/agentlint-claude/src/frontmatter.rs` (re-export)
+  **Run**: `cargo nextest run --workspace`
+
+1. Create `crates/agentlint-frontmatter/Cargo.toml`:
+
+```toml
+[package]
+name    = "agentlint-frontmatter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+agentlint-core = { path = "../agentlint-core" }
+nom             = "7"
+```
+
+2. Create `crates/agentlint-frontmatter/src/lib.rs` — copy the entire body of
+   `crates/agentlint-claude/src/frontmatter.rs` verbatim (the module already has full
+   tests; they travel with the move). The `use agentlint_core::Diagnostic;` import
+   at the top is correct as-is.
+
+3. Add the new member to the root `Cargo.toml` `[workspace]` members list:
+
+```toml
+members = [
+    "crates/agentlint-core",
+    "crates/agentlint-frontmatter",   # add this line
+    "crates/agentlint-claude",
+    ...
+]
+```
+
+4. Remove `nom` from `crates/agentlint-core/Cargo.toml` (agentlint-core never used
+   it — it was in claude only). Verify `crates/agentlint-core/Cargo.toml` has:
+
+```toml
+[dependencies]
+serde_json = "1"
+walkdir    = "2"
+tempfile   = { version = "3", optional = true }
+```
+
+5. Update `crates/agentlint-claude/Cargo.toml` — replace `nom` with
+   `agentlint-frontmatter`:
+
+```toml
+[dependencies]
+agentlint-core        = { path = "../agentlint-core" }
+agentlint-frontmatter = { path = "../agentlint-frontmatter" }
+serde_json            = "1"
+
+[dev-dependencies]
+agentlint-core = { path = "../agentlint-core", features = ["test-utils"] }
+tempfile        = "3"
+```
+
+6. Replace `crates/agentlint-claude/src/frontmatter.rs` with a re-export so all
+   existing call sites (`use super::frontmatter::...`) continue to resolve:
+
+```rust
+//! Frontmatter parser — re-exported from agentlint-frontmatter.
+pub use agentlint_frontmatter::{Field, ParseError, check_required, parse};
+```
+
+7. Verify:
+
+```
+cargo nextest run --workspace    → all green (frontmatter tests now in agentlint-frontmatter)
+cargo clippy --workspace -- -D warnings  → zero warnings
+```
+
+8. Run: `git branch --show-current`
+   Commit: `git commit -m "refactor: extract agentlint-frontmatter crate, decouple parser from claude adapter"`
+
+---
 
 ### Task 1: agentlint-cursor — optional frontmatter validation
 
@@ -33,9 +138,11 @@ harness file formats.
 `crates/agentlint-cursor/src/lib.rs`
 **Run**: `cargo nextest run -p agentlint-cursor`
 
-Cursor `.mdc`/`.md` files may have optional YAML frontmatter. When frontmatter is
-present (file starts with `---\n`), validate it is well-formed. No required fields —
-only structural errors are emitted.
+Requires Task 0 complete.
+
+Cursor `.mdc`/`.md` files have optional YAML frontmatter. When present (file starts
+with `---\n`), validate it is well-formed using `agentlint_frontmatter::parse`.
+No required fields — only the fence structure is checked.
 
 1. Write failing tests:
 
@@ -58,7 +165,7 @@ mod tests {
     fn well_formed_frontmatter_is_clean() {
         let diags = CursorValidator.validate(
             Path::new(".cursor/rules/foo.mdc"),
-            "---\ndescription: lint all files\nglobs: \"**/*.rs\"\nalwaysApply: true\n---\n# body\n",
+            "---\ndescription: lint all files\nglobs: \"**/*.rs\"\n---\n# body\n",
         );
         assert!(diags.is_empty(), "unexpected: {diags:?}");
     }
@@ -67,25 +174,32 @@ mod tests {
     fn unclosed_fence_is_error() {
         let diags = CursorValidator.validate(
             Path::new(".cursor/rules/foo.mdc"),
-            "---\ndescription: lint all files\n# body (no closing fence)\n",
+            "---\ndescription: lint all files\n# no closing fence\n",
         );
         assert!(
-            diags.iter().any(|d| d.message.contains("unclosed frontmatter")),
-            "expected unclosed-frontmatter error, got: {diags:?}",
+            diags.iter().any(|d| d.message.contains("unclosed")),
+            "expected unclosed-fence error, got: {diags:?}",
         );
     }
 }
 ```
 
 Run: `cargo nextest run -p agentlint-cursor -- tests`
-Expected: FAIL (validate returns `vec![]` always)
+Expected: FAIL
 
-2. Add dependencies to `crates/agentlint-cursor/Cargo.toml`:
+2. Update `crates/agentlint-cursor/Cargo.toml`:
 
 ```toml
+[package]
+name    = "agentlint-cursor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
 [dependencies]
-agentlint-core = { path = "../agentlint-core" }
-nom             = "7"
+agentlint-core        = { path = "../agentlint-core" }
+agentlint-frontmatter = { path = "../agentlint-frontmatter" }
 
 [dev-dependencies]
 agentlint-core = { path = "../agentlint-core", features = ["test-utils"] }
@@ -95,11 +209,7 @@ agentlint-core = { path = "../agentlint-core", features = ["test-utils"] }
 
 ```rust
 use agentlint_core::{Diagnostic, Validator};
-use nom::{
-    IResult,
-    bytes::complete::{tag, take_until},
-    sequence::delimited,
-};
+use agentlint_frontmatter::{ParseError, parse};
 use std::path::Path;
 
 pub struct CursorValidator;
@@ -114,25 +224,21 @@ impl Validator for CursorValidator {
     }
 
     fn validate(&self, path: &Path, src: &str) -> Vec<Diagnostic> {
-        if !src.starts_with("---\n") {
+        // Frontmatter is optional — only validate when the opening fence is present.
+        if !src.starts_with("---\n") && !src.starts_with("---\r\n") {
             return vec![];
         }
-        // Frontmatter present — verify it closes.
-        if parse_frontmatter(src).is_err() {
-            return vec![Diagnostic::error(
+        match parse(src) {
+            Ok(_) => vec![],
+            Err(ParseError::UnclosedFence) => vec![Diagnostic::error(
                 path,
                 1,
                 1,
-                "unclosed frontmatter: missing closing `---`",
-            )];
+                "unclosed frontmatter fence: missing closing '---'",
+            )],
+            Err(ParseError::NoFence) => vec![], // unreachable given the starts_with guard
         }
-        vec![]
     }
-}
-
-/// Returns the frontmatter content between the two `---` fences, or an error.
-fn parse_frontmatter(src: &str) -> IResult<&str, &str> {
-    delimited(tag("---\n"), take_until("\n---"), tag("\n---"))(src)
 }
 ```
 
@@ -144,8 +250,7 @@ cargo clippy -p agentlint-cursor -- -D warnings  → zero warnings
 ```
 
 5. Run: `git branch --show-current`
-   Verify output is `main` (or your feature branch). Commit:
-   `git commit -m "feat(cursor): optional frontmatter fence validation"`
+   Commit: `git commit -m "feat(cursor): optional frontmatter fence validation"`
 
 ---
 
@@ -154,9 +259,6 @@ cargo clippy -p agentlint-cursor -- -D warnings  → zero warnings
 **Crate**: `agentlint-codex`
 **File(s)**: `crates/agentlint-codex/src/lib.rs`
 **Run**: `cargo nextest run -p agentlint-codex`
-
-Codex requires `AGENTS.md` to be non-empty (not blank/whitespace-only). Hard error
-if the file is empty or whitespace-only.
 
 1. Write failing tests:
 
@@ -238,8 +340,6 @@ cargo clippy -p agentlint-codex -- -D warnings  → zero warnings
 **File(s)**: `crates/agentlint-gemini/src/lib.rs`
 **Run**: `cargo nextest run -p agentlint-gemini`
 
-Gemini requires `GEMINI.md` to be non-empty.
-
 1. Write failing tests:
 
 ```rust
@@ -320,8 +420,6 @@ cargo clippy -p agentlint-gemini -- -D warnings  → zero warnings
 **File(s)**: `crates/agentlint-pi/src/lib.rs`
 **Run**: `cargo nextest run -p agentlint-pi`
 
-Pi requires `AGENTS.md` and `SYSTEM.md` to be non-empty. Both share the same check.
-
 1. Write failing tests:
 
 ```rust
@@ -332,19 +430,13 @@ mod tests {
 
     #[test]
     fn agents_non_empty_is_clean() {
-        let diags = PiValidator.validate(
-            Path::new("AGENTS.md"),
-            "# Agent\n\nInstructions.\n",
-        );
+        let diags = PiValidator.validate(Path::new("AGENTS.md"), "# Agent\n\nInstructions.\n");
         assert!(diags.is_empty(), "unexpected: {diags:?}");
     }
 
     #[test]
     fn system_non_empty_is_clean() {
-        let diags = PiValidator.validate(
-            Path::new("SYSTEM.md"),
-            "You are a helpful assistant.\n",
-        );
+        let diags = PiValidator.validate(Path::new("SYSTEM.md"), "You are helpful.\n");
         assert!(diags.is_empty(), "unexpected: {diags:?}");
     }
 
@@ -390,12 +482,7 @@ impl Validator for PiValidator {
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("file");
-            return vec![Diagnostic::error(
-                path,
-                1,
-                1,
-                format!("{name} is empty"),
-            )];
+            return vec![Diagnostic::error(path, 1, 1, format!("{name} is empty"))];
         }
         vec![]
     }
@@ -414,15 +501,16 @@ cargo clippy -p agentlint-pi -- -D warnings  → zero warnings
 
 ---
 
-### Task 5: agentlint-opencode — AGENTS.md non-empty + opencode.json valid JSON
+### Task 5: agentlint-opencode — two validators, one concern each
 
-**Crate**: `agentlint-opencode`
+**Crate**: `agentlint-opencode`, `agentlint` (bin)
 **File(s)**: `crates/agentlint-opencode/Cargo.toml`,
-`crates/agentlint-opencode/src/lib.rs`
-**Run**: `cargo nextest run -p agentlint-opencode`
+`crates/agentlint-opencode/src/lib.rs`,
+`src/main.rs`
+**Run**: `cargo nextest run -p agentlint-opencode && cargo check -p agentlint`
 
-OpenCode validates two files: `AGENTS.md` (non-empty) and `opencode.json`
-(well-formed JSON). The dispatch is by filename since the validator claims both patterns.
+OpenCode owns two file types with different validation rules. Each gets its own
+struct — one concern per adapter. No internal filename dispatch.
 
 1. Write failing tests:
 
@@ -434,7 +522,7 @@ mod tests {
 
     #[test]
     fn agents_non_empty_is_clean() {
-        let diags = OpenCodeValidator.validate(
+        let diags = AgentsMarkdownValidator.validate(
             Path::new("AGENTS.md"),
             "# OpenCode Instructions\n",
         );
@@ -443,7 +531,7 @@ mod tests {
 
     #[test]
     fn agents_empty_is_error() {
-        let diags = OpenCodeValidator.validate(Path::new("AGENTS.md"), "");
+        let diags = AgentsMarkdownValidator.validate(Path::new("AGENTS.md"), "");
         assert!(
             diags.iter().any(|d| d.message.contains("empty")),
             "expected empty-file error, got: {diags:?}",
@@ -452,7 +540,7 @@ mod tests {
 
     #[test]
     fn opencode_json_valid_is_clean() {
-        let diags = OpenCodeValidator.validate(
+        let diags = OpenCodeJsonValidator.validate(
             Path::new("opencode.json"),
             r#"{"model": "claude-sonnet-4-6"}"#,
         );
@@ -461,16 +549,13 @@ mod tests {
 
     #[test]
     fn opencode_json_empty_object_is_clean() {
-        let diags = OpenCodeValidator.validate(Path::new("opencode.json"), "{}");
+        let diags = OpenCodeJsonValidator.validate(Path::new("opencode.json"), "{}");
         assert!(diags.is_empty(), "unexpected: {diags:?}");
     }
 
     #[test]
     fn opencode_json_invalid_is_error() {
-        let diags = OpenCodeValidator.validate(
-            Path::new("opencode.json"),
-            "{bad json",
-        );
+        let diags = OpenCodeJsonValidator.validate(Path::new("opencode.json"), "{bad json");
         assert!(
             diags.iter().any(|d| d.message.contains("invalid JSON")),
             "expected invalid-JSON error, got: {diags:?}",
@@ -482,16 +567,9 @@ mod tests {
 Run: `cargo nextest run -p agentlint-opencode -- tests`
 Expected: FAIL
 
-2. Add dependencies to `crates/agentlint-opencode/Cargo.toml`:
+2. `crates/agentlint-opencode/Cargo.toml` — verify (already correct, no change):
 
 ```toml
-[package]
-name = "agentlint-opencode"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
-
 [dependencies]
 agentlint-core = { path = "../agentlint-core" }
 serde_json      = "1"
@@ -500,98 +578,97 @@ serde_json      = "1"
 agentlint-core = { path = "../agentlint-core", features = ["test-utils"] }
 ```
 
-3. Implement `crates/agentlint-opencode/src/lib.rs`:
+3. Replace `crates/agentlint-opencode/src/lib.rs` entirely:
 
 ```rust
 use agentlint_core::{Diagnostic, Validator};
 use std::path::Path;
 
-pub struct OpenCodeValidator;
+/// Validates that OpenCode's `AGENTS.md` is non-empty.
+pub struct AgentsMarkdownValidator;
 
-impl Validator for OpenCodeValidator {
+impl Validator for AgentsMarkdownValidator {
     fn patterns(&self) -> &[&str] {
-        &["AGENTS.md", "opencode.json"]
+        &["AGENTS.md"]
     }
 
     fn validate(&self, path: &Path, src: &str) -> Vec<Diagnostic> {
-        match path.file_name().and_then(|n| n.to_str()) {
-            Some("AGENTS.md") => validate_agents_md(path, src),
-            Some("opencode.json") => validate_opencode_json(path, src),
-            _ => vec![],
+        if src.trim().is_empty() {
+            return vec![Diagnostic::error(path, 1, 1, "AGENTS.md is empty")];
         }
+        vec![]
     }
 }
 
-fn validate_agents_md(path: &Path, src: &str) -> Vec<Diagnostic> {
-    if src.trim().is_empty() {
-        return vec![Diagnostic::error(path, 1, 1, "AGENTS.md is empty")];
-    }
-    vec![]
-}
+/// Validates that `opencode.json` is well-formed JSON.
+pub struct OpenCodeJsonValidator;
 
-fn validate_opencode_json(path: &Path, src: &str) -> Vec<Diagnostic> {
-    if let Err(e) = serde_json::from_str::<serde_json::Value>(src) {
-        return vec![Diagnostic::error(
-            path,
-            e.line(),
-            e.column(),
-            format!("invalid JSON: {e}"),
-        )];
+impl Validator for OpenCodeJsonValidator {
+    fn patterns(&self) -> &[&str] {
+        &["opencode.json"]
     }
-    vec![]
+
+    fn validate(&self, path: &Path, src: &str) -> Vec<Diagnostic> {
+        if let Err(e) = serde_json::from_str::<serde_json::Value>(src) {
+            return vec![Diagnostic::error(
+                path,
+                e.line(),
+                e.column(),
+                format!("invalid JSON: {e}"),
+            )];
+        }
+        vec![]
+    }
 }
 ```
 
-4. Verify:
+4. Update `src/main.rs` validators list — replace the single `OpenCodeValidator`
+   line with the two new structs:
+
+```rust
+// remove:
+Box::new(agentlint_opencode::OpenCodeValidator),
+
+// add:
+Box::new(agentlint_opencode::AgentsMarkdownValidator),
+Box::new(agentlint_opencode::OpenCodeJsonValidator),
+```
+
+5. Verify:
 
 ```
 cargo nextest run -p agentlint-opencode    → all green
-cargo clippy -p agentlint-opencode -- -D warnings  → zero warnings
+cargo check -p agentlint                  → no errors
+cargo clippy --workspace -- -D warnings   → zero warnings
 ```
 
-5. Run: `git branch --show-current`
-   Commit: `git commit -m "feat(opencode): AGENTS.md non-empty + opencode.json JSON validation"`
+6. Run: `git branch --show-current`
+   Commit: `git commit -m "feat(opencode): split into AgentsMarkdownValidator + OpenCodeJsonValidator"`
 
 ---
 
-### Task 6: workspace integration — nextest all green
+### Task 6: workspace integration
 
 **Crate**: workspace
-**File(s)**: none
-**Run**: `cargo nextest run --workspace`
+**Run**: `cargo nextest run --workspace && cargo clippy --workspace -- -D warnings`
 
-After all five tasks above are committed, verify the full workspace is green and
-clippy-clean.
-
-1. Run:
+After all prior tasks are committed, verify the full workspace is green:
 
 ```
 cargo nextest run --workspace
-```
-
-Expected: all tests pass, zero failures.
-
-2. Run:
-
-```
 cargo clippy --workspace -- -D warnings
-```
-
-Expected: zero warnings.
-
-3. Push:
-
-```
 git push
 ```
 
 ---
 
-## Quality Rules
+## Dependency order
 
-- No placeholders: every code block is copy-paste ready.
-- Exact paths: all file paths match the actual workspace layout.
-- TDD for every task: failing test confirmed before implementation.
-- Each task ends with a commit.
-- Tasks 2–4 are independent and can run in parallel (no shared files).
-- Tasks 1 and 5 require Cargo.toml edits before the impl step.
+```
+Task 0 (frontmatter crate) ──► Task 1 (cursor)
+                            ──► Task 5 (opencode) — independent of Task 1
+
+Tasks 2, 3, 4 — fully independent, run in parallel
+
+Task 6 — after all others
+```

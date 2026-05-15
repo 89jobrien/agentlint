@@ -2,34 +2,27 @@ project: agentlint
 id: agentlint
 updated: 2026-05-15
 items:
-  - id: t1
-    name: agentlint-cursor---optional-frontmatter-validation
-    priority: P2
-    status: open
-    title: agentlint-cursor — optional frontmatter validation
-    description: Task t1 in progress
   - id: uncommitted-work
     name: uncommitted-work
     priority: P1
     status: open
-    title: Uncommitted changes (5 files)
+    title: Uncommitted changes (2 files)
     description: |-
       Working tree has uncommitted changes:
       .ctx/HANDOFF.agentlint.agentlint.yaml
-      crates/agentlint-codex/src/lib.rs
-      crates/agentlint-cursor/src/lib.rs
-      crates/agentlint-gemini/src/lib.rs
       docs/plans/2026-05-15-wave1-stub-validators.md
     files:
       - .ctx/HANDOFF.agentlint.agentlint.yaml
-      - crates/agentlint-codex/src/lib.rs
-      - crates/agentlint-cursor/src/lib.rs
-      - crates/agentlint-gemini/src/lib.rs
       - docs/plans/2026-05-15-wave1-stub-validators.md
 log:
-  - date: "20260515.215843"
-    summary: done=0 running=1 pending=5 blocked=0
+  - date: "20260515.220813"
+    summary: done=1 running=0 pending=5 blocked=0
     commits:
+      - 1a50d136f621cad0c0bc64074a7c7de488082183
+      - bf40206915d542a35e37dfbd8620a6e9aa64f188
+      - 393ca3dfd4cedb4b1c6e3814860c5fc963cb9fea
+      - 6daea16972ff41423243647875125726b5104df9
+      - 3c67fbea46b9733e7fd2400804e3eb26a08e4fa7
       - 4ca5e48315c67899e177ae4f4d867275d94964f6
       - 474919cf0fbb66fd4e814eaed021ebd838ef97f7
       - 1ed1d425d443cc300613a5eb663e88f0a3909706
