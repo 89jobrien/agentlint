@@ -12,10 +12,12 @@ use xshell::{Shell, cmd};
 
 pub fn land(sh: &Shell) -> Result<()> {
     // 1a. Guard: refuse if a rebase is already in progress.
-    let git_dir = cmd!(sh, "git rev-parse --git-dir")
+    let git_dir_rel = cmd!(sh, "git rev-parse --git-dir")
         .read()
         .context("not a git repo")?;
-    let git_dir = std::path::Path::new(git_dir.trim());
+    // git rev-parse --git-dir may return a relative path; join against the
+    // workspace root (guaranteed by xtask's sh.change_dir(&root) in main).
+    let git_dir = sh.current_dir().join(git_dir_rel.trim());
     if git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists() {
         bail!(
             "rebase in progress — resolve conflicts, then `git rebase --continue` (or \
@@ -39,6 +41,8 @@ pub fn land(sh: &Shell) -> Result<()> {
         .context("git fetch failed")?;
 
     // 3. Rebase onto origin/main.
+    // Note: replays commits since the branch diverged from origin/main. Assumes
+    // the branch was created from main (the normal workflow for this repo).
     eprintln!("→ rebasing {branch} onto origin/main");
     cmd!(sh, "git rebase origin/main")
         .run()

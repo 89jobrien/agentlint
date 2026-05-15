@@ -1,4 +1,6 @@
-//! `cargo xtask pre-push-hook` — commit_ranger: resolves pushed ref ranges.
+//! commit_ranger — resolves pushed ref ranges for the pre-push hook.
+//!
+//! Invoked via `cargo xtask pre-push-hook`.
 //!
 //! Git pipes ref lines to stdin:
 //!   <local_ref> <local_oid> <remote_ref> <remote_oid>
@@ -10,10 +12,14 @@ use anyhow::{Context, Result};
 use std::io::{self, BufRead};
 use xshell::{Shell, cmd};
 
+// 40-char SHA-1 zero sentinel. Git uses this to signal non-existent refs.
+// Note: SHA-256 repos use a 64-char zero OID — not supported here.
 const ZERO_OID: &str = "0000000000000000000000000000000000000000";
 
 pub fn run(sh: &Shell) -> Result<()> {
     let stdin = io::stdin();
+    let mut has_refs = false;
+
     for line in stdin.lock().lines() {
         let line = line.context("failed to read pre-push stdin")?;
         let parts: Vec<&str> = line.split_whitespace().collect();
@@ -27,6 +33,8 @@ pub fn run(sh: &Shell) -> Result<()> {
             continue;
         }
 
+        has_refs = true;
+
         let base = if remote_oid == ZERO_OID {
             // New branch — find divergence from main, fall back to initial commit.
             cmd!(sh, "git merge-base {local_oid} main")
@@ -38,6 +46,11 @@ pub fn run(sh: &Shell) -> Result<()> {
         };
 
         println!("{base}..{local_oid}");
+    }
+
+    // Skip the gate if there are no new commits (tag-only or deletion-only push).
+    if !has_refs {
+        return Ok(());
     }
 
     // Run the rustqual pre-push gate.
