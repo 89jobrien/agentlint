@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# pre-push shim — forwards git's ref lines to `cargo xtask pre-push-hook`.
+set -eou pipefail
+exec cargo xtask pre-push-hook

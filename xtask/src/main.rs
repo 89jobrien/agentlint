@@ -11,6 +11,7 @@
 //! | detect-changes | classify changed paths, emit GHA outputs               |
 //! | ci-watch     | watch latest GHA run with job-level detail                |
 //! | land         | fetch + rebase onto main + CI gate + push (merge queue)   |
+//! | pre-push-hook| git pre-push hook: resolve ranges + rustqual gate          |
 
 use anyhow::{Result, bail};
 use std::env;
@@ -18,6 +19,7 @@ use xshell::Shell;
 
 mod bump;
 mod ci_watch;
+mod commit_ranger;
 mod detect_changes;
 mod gates;
 mod land;
@@ -67,6 +69,7 @@ fn main() -> Result<()> {
             detect_changes::run(&root, &base)
         }
         Some("land") => land::land(&sh),
+        Some("pre-push-hook") => commit_ranger::run(&sh),
         Some("ci-watch") => {
             let branch = {
                 let args: Vec<String> = env::args().collect();
@@ -91,6 +94,7 @@ fn main() -> Result<()> {
             eprintln!("  bump [patch|minor|major]     bump workspace version only");
             eprintln!("  ci-watch [--branch <branch>] watch latest GHA run");
             eprintln!("  land                         fetch + rebase + CI gate + push");
+            eprintln!("  pre-push-hook                git pre-push hook: ranges + rustqual gate");
             Ok(())
         }
     }
