@@ -7,6 +7,7 @@
 //! | pre-commit   | fmt-check + clippy (validation only, fast)                |
 //! | publish      | publish crates to crates.io in dependency order (staggered)|
 //! | release      | bump version, commit, tag, push, create GH release        |
+//! | detect-changes | classify changed paths, emit GHA outputs               |
 //! | ci-watch     | watch latest GHA run with job-level detail                |
 
 use anyhow::{Result, bail};
@@ -15,6 +16,7 @@ use xshell::Shell;
 
 mod bump;
 mod ci_watch;
+mod detect_changes;
 mod gates;
 mod publish;
 mod release;
@@ -52,6 +54,12 @@ fn main() -> Result<()> {
             let level = env::args().nth(2).unwrap_or_else(|| "patch".to_string());
             bump::bump(&root, &level)
         }
+        Some("detect-changes") => {
+            let base = env::args()
+                .nth(2)
+                .unwrap_or_else(|| "origin/main".to_string());
+            detect_changes::run(&root, &base)
+        }
         Some("ci-watch") => {
             let branch = {
                 let args: Vec<String> = env::args().collect();
@@ -70,6 +78,7 @@ fn main() -> Result<()> {
             eprintln!(
                 "  publish [--from <crate>]  publish crates to crates.io (staggered, 90s gaps)"
             );
+            eprintln!("  detect-changes [<base-ref>]  classify changed paths, emit GHA outputs");
             eprintln!("  release [patch|minor|major]  bump, tag, push, create GH release");
             eprintln!("  bump [patch|minor|major]     bump workspace version only");
             eprintln!("  ci-watch [--branch <branch>] watch latest GHA run");
