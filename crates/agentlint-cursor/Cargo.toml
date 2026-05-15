@@ -1,0 +1,10 @@
+[package]
+name = "agentlint-cursor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+agentlint-core = { path = "../agentlint-core" }
+nom            = "7"

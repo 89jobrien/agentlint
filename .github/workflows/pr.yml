@@ -1,0 +1,57 @@
+name: PR
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: install actionlint
+        run: |
+          bash <(curl -s https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.4
+          sudo mv actionlint /usr/local/bin/
+      - name: run actionlint
+        run: actionlint -config-file .github/actionlint.yaml .github/workflows/ .github/actions/
+
+  lint:
+    name: lint + fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo xtask ci (lint)
+        run: cargo xtask ci
+
+  ci-ok:
+    name: CI passed
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [actionlint, lint]
+    steps:
+      - name: check job results
+        run: |
+          results=(
+            "${{ needs.actionlint.result }}"
+            "${{ needs.lint.result }}"
+          )
+          for r in "${results[@]}"; do
+            if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then
+              echo "CI failed: at least one job reported $r"
+              exit 1
+            fi
+          done
+          echo "All jobs passed or were skipped"

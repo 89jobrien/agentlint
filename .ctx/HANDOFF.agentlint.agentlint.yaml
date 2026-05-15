@@ -1,0 +1,34 @@
+project: agentlint
+id: agentlint
+updated: 2026-05-15
+items:
+  - id: uncommitted-work
+    name: uncommitted-work
+    priority: P1
+    status: open
+    title: Uncommitted changes (8 files)
+    description: |-
+      Working tree has uncommitted changes:
+      .ctx/
+      .gitignore
+      CLAUDE.md
+      Cargo.lock
+      Cargo.toml
+      crates/
+      src/
+      target/
+    files:
+      - .ctx/
+      - .gitignore
+      - CLAUDE.md
+      - Cargo.lock
+      - Cargo.toml
+      - crates/
+      - src/
+      - target/
+log:
+  - date: "20260515.214612"
+    summary: done=0 running=0 pending=0 blocked=0
+    commits:
+      - 1ed1d425d443cc300613a5eb663e88f0a3909706
+      - b12b20ad2b72e9268a6f22f15f97848e075f6575

@@ -1,0 +1,41 @@
+[workspace]
+members = [
+    "crates/agentlint-core",
+    "crates/agentlint-claude",
+    "crates/agentlint-cursor",
+    "crates/agentlint-codex",
+    "crates/agentlint-opencode",
+    "crates/agentlint-gemini",
+    "crates/agentlint-pi",
+    "xtask",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+authors = ["Joseph O'Brien"]
+repository = "https://github.com/89jobrien/agentlint"
+
+[package]
+name = "agentlint"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "agentlint"
+path = "src/main.rs"
+
+[dependencies]
+agentlint-core    = { path = "crates/agentlint-core" }
+agentlint-claude  = { path = "crates/agentlint-claude" }
+agentlint-cursor  = { path = "crates/agentlint-cursor" }
+agentlint-codex   = { path = "crates/agentlint-codex" }
+agentlint-opencode = { path = "crates/agentlint-opencode" }
+agentlint-gemini  = { path = "crates/agentlint-gemini" }
+agentlint-pi      = { path = "crates/agentlint-pi" }
+clap              = { version = "4", features = ["derive"] }
