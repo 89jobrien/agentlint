@@ -11,7 +11,19 @@ use anyhow::{Context, Result, bail};
 use xshell::{Shell, cmd};
 
 pub fn land(sh: &Shell) -> Result<()> {
-    // 1. Guard: refuse to land from main itself.
+    // 1a. Guard: refuse if a rebase is already in progress.
+    let git_dir = cmd!(sh, "git rev-parse --git-dir")
+        .read()
+        .context("not a git repo")?;
+    let git_dir = std::path::Path::new(git_dir.trim());
+    if git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists() {
+        bail!(
+            "rebase in progress — resolve conflicts, then `git rebase --continue` (or \
+             `git rebase --abort` to cancel), and re-run `cargo xtask land`"
+        );
+    }
+
+    // 1b. Guard: refuse to land from main itself.
     let branch = cmd!(sh, "git branch --show-current")
         .read()
         .context("failed to determine current branch")?;
