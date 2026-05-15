@@ -2,7 +2,6 @@ use agentlint_core::{Diagnostic, Validator};
 use std::path::{Component, Path};
 
 mod frontmatter;
-mod macros;
 
 // ---------------------------------------------------------------------------
 // File-kind classifier

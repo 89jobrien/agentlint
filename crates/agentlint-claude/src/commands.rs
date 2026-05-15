@@ -1,8 +1,23 @@
-use crate::macros::frontmatter_validator;
+use agentlint_core::Diagnostic;
+use agentlint_frontmatter::{FieldRule, FrontmatterValidator};
+use std::path::Path;
+use std::sync::OnceLock;
 
 pub struct CommandsValidator;
 
-frontmatter_validator!(CommandsValidator, required: ["name", "description"]);
+impl CommandsValidator {
+    pub fn validate(path: &Path, src: &str) -> Vec<Diagnostic> {
+        static VALIDATOR: OnceLock<FrontmatterValidator> = OnceLock::new();
+        VALIDATOR
+            .get_or_init(|| {
+                FrontmatterValidator::builder()
+                    .required(FieldRule::new("name"))
+                    .required(FieldRule::new("description"))
+                    .build()
+            })
+            .validate(path, src)
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Tests
