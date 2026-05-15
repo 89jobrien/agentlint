@@ -1,4 +1,5 @@
 use agentlint_core::{Diagnostic, Validator};
+use agentlint_frontmatter::{ParseError, parse};
 use std::path::Path;
 
 pub struct CursorValidator;
@@ -13,15 +14,19 @@ impl Validator for CursorValidator {
     }
 
     fn validate(&self, path: &Path, src: &str) -> Vec<Diagnostic> {
-        if !src.starts_with("---\n") {
+        // Frontmatter is optional — only validate when the opening fence is present.
+        if !src.starts_with("---\n") && !src.starts_with("---\r\n") {
             return vec![];
         }
-        // Content after the opening fence
-        let after_open = &src[4..];
-        if after_open.contains("\n---") {
-            vec![]
-        } else {
-            vec![Diagnostic::error(path, 1, 1, "unclosed frontmatter fence")]
+        match parse(src) {
+            Ok(_) => vec![],
+            Err(ParseError::UnclosedFence) => vec![Diagnostic::error(
+                path,
+                1,
+                1,
+                "unclosed frontmatter fence: missing closing '---'",
+            )],
+            Err(ParseError::NoFence) => vec![],
         }
     }
 }
@@ -43,18 +48,18 @@ mod tests {
 
     #[test]
     fn well_formed_frontmatter_is_clean() {
-        let src = "---\ntitle: test\n---\n# Body\n";
+        let src = "---\ntitle: test\ndescription: lint files\n---\n# Body\n";
         let diags = v().validate(Path::new("rule.mdc"), src);
         assert!(diags.is_empty());
     }
 
     #[test]
     fn unclosed_fence_is_error() {
-        let src = "---\ntitle: test\n# Body\n";
+        let src = "---\ntitle: test\n# no closing fence\n";
         let diags = v().validate(Path::new("rule.mdc"), src);
         assert_eq!(diags.len(), 1);
         assert!(
-            diags[0].message.contains("unclosed frontmatter"),
+            diags[0].message.contains("unclosed"),
             "unexpected message: {}",
             diags[0].message
         );

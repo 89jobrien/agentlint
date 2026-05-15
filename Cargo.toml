@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/agentlint-core",
+    "crates/agentlint-frontmatter",
     "crates/agentlint-claude",
     "crates/agentlint-cursor",
     "crates/agentlint-codex",

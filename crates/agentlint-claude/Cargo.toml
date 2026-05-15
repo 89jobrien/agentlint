@@ -6,8 +6,8 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
-agentlint-core = { path = "../agentlint-core" }
-nom            = "7"
+agentlint-core        = { path = "../agentlint-core" }
+agentlint-frontmatter = { path = "../agentlint-frontmatter" }
 serde_json     = "1"
 
 [dev-dependencies]

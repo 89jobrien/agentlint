@@ -1,10 +1,13 @@
 [package]
-name = "agentlint-cursor"
+name    = "agentlint-cursor"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 
 [dependencies]
-agentlint-core = { path = "../agentlint-core" }
-nom            = "7"
+agentlint-core        = { path = "../agentlint-core" }
+agentlint-frontmatter = { path = "../agentlint-frontmatter" }
+
+[dev-dependencies]
+agentlint-core = { path = "../agentlint-core", features = ["test-utils"] }
