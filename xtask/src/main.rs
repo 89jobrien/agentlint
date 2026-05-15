@@ -5,7 +5,7 @@
 //! | ci           | fmt-check + clippy -D warnings + nextest (CI gate)        |
 //! | fix          | fmt + clippy --fix (mutates files)                        |
 //! | pre-commit   | fmt-check + clippy (validation only, fast)                |
-//! | publish      | publish crates to crates.io in dependency order           |
+//! | publish      | publish crates to crates.io in dependency order (staggered)|
 //! | release      | bump version, commit, tag, push, create GH release        |
 //! | ci-watch     | watch latest GHA run with job-level detail                |
 
@@ -35,7 +35,15 @@ fn main() -> Result<()> {
         Some("ci") => gates::ci(&sh),
         Some("fix") => gates::fix(&sh),
         Some("pre-commit") => gates::pre_commit(&sh),
-        Some("publish") => publish::publish(&sh, &root),
+        Some("publish") => {
+            let from = {
+                let args: Vec<String> = env::args().collect();
+                args.windows(2)
+                    .find(|w| w[0] == "--from")
+                    .map(|w| w[1].clone())
+            };
+            publish::publish(&sh, &root, from.as_deref())
+        }
         Some("release") => {
             let level = env::args().nth(2).unwrap_or_else(|| "patch".to_string());
             release::release(&sh, &root, &level)
@@ -59,7 +67,9 @@ fn main() -> Result<()> {
             eprintln!("  ci              fmt-check + clippy + nextest (CI gate)");
             eprintln!("  fix             fmt + clippy --fix (mutates files)");
             eprintln!("  pre-commit      fmt-check + clippy (validation only)");
-            eprintln!("  publish         publish crates to crates.io in dependency order");
+            eprintln!(
+                "  publish [--from <crate>]  publish crates to crates.io (staggered, 90s gaps)"
+            );
             eprintln!("  release [patch|minor|major]  bump, tag, push, create GH release");
             eprintln!("  bump [patch|minor|major]     bump workspace version only");
             eprintln!("  ci-watch [--branch <branch>] watch latest GHA run");
