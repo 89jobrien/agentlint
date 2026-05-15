@@ -11,3 +11,6 @@ description = "YAML frontmatter parser for agentlint — shared by Claude Code a
 [dependencies]
 agentlint-core = { path = "../agentlint-core", version = "0.1.0" }
 nom             = "7"
+
+[dev-dependencies]
+proptest       = "1"

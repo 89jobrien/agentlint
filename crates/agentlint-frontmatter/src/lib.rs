@@ -13,6 +13,10 @@
 //! Produces `Vec<Field>` with 1-indexed line numbers for accurate diagnostics.
 //! Parsing is line-based; nom is used for field extraction within each line.
 
+pub mod builder;
+
+pub use builder::{FieldFormat, FieldRule, FrontmatterValidator, ValidatorBuilder};
+
 use agentlint_core::Diagnostic;
 use nom::{
     IResult,
