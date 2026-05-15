@@ -21,7 +21,7 @@ name = "agentlint-claude"
 version = "0.1.0"
 dependencies = [
  "agentlint-core",
- "nom",
+ "agentlint-frontmatter",
  "serde_json",
  "tempfile",
 ]
@@ -44,6 +44,14 @@ dependencies = [
 
 [[package]]
 name = "agentlint-cursor"
+version = "0.1.0"
+dependencies = [
+ "agentlint-core",
+ "agentlint-frontmatter",
+]
+
+[[package]]
+name = "agentlint-frontmatter"
 version = "0.1.0"
 dependencies = [
  "agentlint-core",
