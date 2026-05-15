@@ -52,15 +52,15 @@ impl SettingsValidator {
         // permissions.allow / permissions.deny must be arrays of strings.
         if let Some(perms) = obj.get("permissions").and_then(|v| v.as_object()) {
             for &field in &["allow", "deny"] {
-                if let Some(v) = perms.get(field) {
-                    if !is_array_of_strings(v) {
-                        diags.push(Diagnostic::error(
-                            path,
-                            1,
-                            1,
-                            format!("permissions.{field} must be an array of strings"),
-                        ));
-                    }
+                if let Some(v) = perms.get(field)
+                    && !is_array_of_strings(v)
+                {
+                    diags.push(Diagnostic::error(
+                        path,
+                        1,
+                        1,
+                        format!("permissions.{field} must be an array of strings"),
+                    ));
                 }
             }
         }
@@ -89,7 +89,7 @@ impl SettingsValidator {
 
 fn is_array_of_strings(v: &serde_json::Value) -> bool {
     v.as_array()
-        .map_or(false, |arr| arr.iter().all(|e| e.is_string()))
+        .is_some_and(|arr| arr.iter().all(|e| e.is_string()))
 }
 
 // ---------------------------------------------------------------------------
