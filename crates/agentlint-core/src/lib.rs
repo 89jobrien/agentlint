@@ -105,35 +105,24 @@ pub struct RunResult {
     pub files_checked: usize,
 }
 
-/// Walk `roots` (files or directories), dispatch each file to the first
-/// matching validator, and collect all diagnostics.
-pub fn run(roots: &[PathBuf], validators: &[Box<dyn Validator>]) -> RunResult {
+/// Pure domain runner: dispatch `files` (already-loaded path+content pairs) to
+/// matching validators and collect diagnostics.
+///
+/// This is the hexagonal core — it has no filesystem dependency. Infrastructure
+/// callers (see [`run`]) are responsible for discovery and I/O.
+pub fn run_on(
+    files: impl IntoIterator<Item = (PathBuf, String)>,
+    validators: &[Box<dyn Validator>],
+) -> RunResult {
     let mut diagnostics = Vec::new();
     let mut files_checked = 0;
 
-    let paths = collect_paths(roots);
-
-    for path in paths {
+    for (path, src) in files {
         let matched = find_validators(&path, validators);
         if matched.is_empty() {
             continue;
         }
-
         files_checked += 1;
-
-        let src = match std::fs::read_to_string(&path) {
-            Ok(s) => s,
-            Err(e) => {
-                diagnostics.push(Diagnostic::error(
-                    &path,
-                    1,
-                    1,
-                    format!("could not read file: {e}"),
-                ));
-                continue;
-            }
-        };
-
         for validator in matched {
             diagnostics.extend(validator.validate(&path, &src));
         }
@@ -143,6 +132,35 @@ pub fn run(roots: &[PathBuf], validators: &[Box<dyn Validator>]) -> RunResult {
         diagnostics,
         files_checked,
     }
+}
+
+/// Infrastructure convenience: walk `roots`, read each file, then delegate to
+/// [`run_on`]. Read errors are surfaced as [`Diagnostic::error`] entries rather
+/// than panicking.
+pub fn run(roots: &[PathBuf], validators: &[Box<dyn Validator>]) -> RunResult {
+    let mut read_errors: Vec<Diagnostic> = Vec::new();
+
+    let files: Vec<(PathBuf, String)> = collect_paths(roots)
+        .into_iter()
+        .filter_map(|path| match std::fs::read_to_string(&path) {
+            Ok(src) => Some((path, src)),
+            Err(e) => {
+                read_errors.push(Diagnostic::error(
+                    &path,
+                    1,
+                    1,
+                    format!("could not read file: {e}"),
+                ));
+                None
+            }
+        })
+        .collect();
+
+    let mut result = run_on(files, validators);
+    // Prepend read errors so they appear before validation diagnostics.
+    read_errors.extend(result.diagnostics);
+    result.diagnostics = read_errors;
+    result
 }
 
 fn collect_paths(roots: &[PathBuf]) -> Vec<PathBuf> {
