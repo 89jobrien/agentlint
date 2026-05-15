@@ -1,13 +1,16 @@
 [package]
-name    = "agentlint-cursor"
+name = "agentlint-cursor"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "agentlint validator for Cursor rule files (.mdc, .md, .cursorrules)"
 
 [dependencies]
-agentlint-core        = { path = "../agentlint-core" }
-agentlint-frontmatter = { path = "../agentlint-frontmatter" }
+agentlint-core        = { path = "../agentlint-core",        version = "0.1.0" }
+agentlint-frontmatter = { path = "../agentlint-frontmatter", version = "0.1.0" }
 
 [dev-dependencies]
-agentlint-core = { path = "../agentlint-core", features = ["test-utils"] }
+agentlint-core = { path = "../agentlint-core", version = "0.1.0", features = ["test-utils"] }

@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Core primitives for agentlint: Diagnostic, Validator trait, file runner, and output formatters"
 
 [features]
 test-utils = ["dep:tempfile"]

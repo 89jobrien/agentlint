@@ -1,10 +1,13 @@
 [package]
-name    = "agentlint-frontmatter"
+name = "agentlint-frontmatter"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "YAML frontmatter parser for agentlint — shared by Claude Code and Cursor validators"
 
 [dependencies]
-agentlint-core = { path = "../agentlint-core" }
+agentlint-core = { path = "../agentlint-core", version = "0.1.0" }
 nom             = "7"
