@@ -15,7 +15,7 @@
 
 pub mod builder;
 
-pub use builder::{FieldFormat, FieldRule, FrontmatterValidator, ValidatorBuilder};
+pub use builder::{FieldFormat, FieldRule, FrontmatterValidator};
 
 use agentlint_core::Diagnostic;
 use nom::{

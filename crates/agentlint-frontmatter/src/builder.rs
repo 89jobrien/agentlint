@@ -140,6 +140,8 @@ impl FrontmatterValidator {
 
         let fields = match parse(src) {
             Ok(f) => f,
+            // Files without a frontmatter fence are not agent config files
+            // and are silently skipped rather than flagged as errors.
             Err(ParseError::NoFence) => return vec![],
             Err(ParseError::UnclosedFence) => {
                 return vec![Diagnostic::error(
@@ -172,7 +174,7 @@ impl FrontmatterValidator {
                     ));
                 }
                 Some(f) => {
-                    check_constraints(path, f.line, &f.value, rule, path, &mut diags);
+                    check_constraints(path, f.line, &f.value, rule, &mut diags);
                 }
             }
         }
@@ -181,7 +183,7 @@ impl FrontmatterValidator {
             if let Some(f) = fields.iter().find(|f| f.key == rule.name)
                 && !f.value.is_empty()
             {
-                check_constraints(path, f.line, &f.value, rule, path, &mut diags);
+                check_constraints(path, f.line, &f.value, rule, &mut diags);
             }
         }
 
@@ -198,7 +200,6 @@ fn check_constraints(
     line: usize,
     value: &str,
     rule: &FieldRule,
-    _path: &Path,
     diags: &mut Vec<Diagnostic>,
 ) {
     if let Some(max) = rule.max_len
