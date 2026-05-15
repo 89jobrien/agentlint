@@ -37,6 +37,9 @@ const PUBLISH_ORDER: &[&str] = &[
 ];
 
 /// `from_crate`: if `Some`, skip all crates before this one (resume after partial run).
+/// Already-published crates are skipped automatically (crates.io returns 200 on re-upload
+/// of an identical version, but errors on version conflict — we detect "already uploaded"
+/// in stderr and treat it as success).
 pub fn publish(sh: &Shell, root: &Path, from_crate: Option<&str>) -> Result<()> {
     let total = PUBLISH_ORDER.len();
     let start = match from_crate {
@@ -56,9 +59,19 @@ pub fn publish(sh: &Shell, root: &Path, from_crate: Option<&str>) -> Result<()> 
         };
 
         eprintln!("[{n}/{total}] publishing {krate}...");
-        cmd!(sh, "cargo publish --manifest-path {manifest}")
-            .run()
-            .with_context(|| format!("failed to publish {krate}"))?;
+        let output = cmd!(sh, "cargo publish --manifest-path {manifest}")
+            .ignore_status()
+            .output()
+            .with_context(|| format!("failed to run cargo publish for {krate}"))?;
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if output.status.success() {
+            // published successfully
+        } else if stderr.contains("already uploaded") || stderr.contains("already exists") {
+            eprintln!("  {krate} already published — skipping");
+        } else {
+            anyhow::bail!("failed to publish {krate}:\n{stderr}");
+        }
 
         if n < total {
             eprintln!("  waiting {STAGGER_SECS}s before next publish...");
