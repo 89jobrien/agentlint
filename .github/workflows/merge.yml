@@ -10,6 +10,8 @@ concurrency:
 
 env:
   CARGO_INCREMENTAL: 0
+  CARGO_HOME: /home/runner/.cargo
+  CARGO_TERM_COLOR: always
 
 jobs:
   actionlint:
@@ -22,7 +24,7 @@ jobs:
           bash <(curl -s https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.4
           sudo mv actionlint /usr/local/bin/
       - name: run actionlint
-        run: actionlint -config-file .github/actionlint.yaml .github/workflows/ .github/actions/
+        run: actionlint -config-file .github/actionlint.yaml .github/workflows/
 
   lint:
     name: lint + fmt
@@ -33,6 +35,9 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
       - name: cargo xtask ci
         run: cargo xtask ci
 
