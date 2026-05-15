@@ -5,6 +5,7 @@
 //! | ci           | fmt-check + clippy -D warnings + nextest (CI gate)        |
 //! | fix          | fmt + clippy --fix (mutates files)                        |
 //! | pre-commit   | fmt-check + clippy (validation only, fast)                |
+//! | pre-push     | rustqual regression check against committed baseline       |
 //! | publish      | publish crates to crates.io in dependency order (staggered)|
 //! | release      | bump version, commit, tag, push, create GH release        |
 //! | detect-changes | classify changed paths, emit GHA outputs               |
@@ -38,6 +39,7 @@ fn main() -> Result<()> {
         Some("ci") => gates::ci(&sh),
         Some("fix") => gates::fix(&sh),
         Some("pre-commit") => gates::pre_commit(&sh),
+        Some("pre-push") => gates::pre_push(&sh),
         Some("publish") => {
             let from = {
                 let args: Vec<String> = env::args().collect();
@@ -76,6 +78,7 @@ fn main() -> Result<()> {
             eprintln!("  ci              fmt-check + clippy + nextest (CI gate)");
             eprintln!("  fix             fmt + clippy --fix (mutates files)");
             eprintln!("  pre-commit      fmt-check + clippy (validation only)");
+            eprintln!("  pre-push        rustqual regression check vs baseline");
             eprintln!(
                 "  publish [--from <crate>]  publish crates to crates.io (staggered, 90s gaps)"
             );

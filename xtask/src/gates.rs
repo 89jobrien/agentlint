@@ -1,4 +1,4 @@
-//! Quality gates: ci, fix, pre-commit.
+//! Quality gates: ci, fix, pre-commit, pre-push.
 
 use anyhow::{Context, Result};
 use xshell::{Shell, cmd};
@@ -52,6 +52,18 @@ pub fn pre_commit(sh: &Shell) -> Result<()> {
         .context("actionlint failed")?;
     }
     eprintln!("pre-commit gate passed");
+    Ok(())
+}
+
+/// Pre-push gate: rustqual regression check against the committed baseline.
+pub fn pre_push(sh: &Shell) -> Result<()> {
+    cmd!(
+        sh,
+        "rustqual --compare .rustqual-baseline.json --fail-on-regression"
+    )
+    .run()
+    .context("rustqual regression check failed")?;
+    eprintln!("pre-push gate passed");
     Ok(())
 }
 
