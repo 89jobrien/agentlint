@@ -21,6 +21,7 @@ mod detect_changes;
 mod gates;
 mod publish;
 mod release;
+mod rustqual;
 mod utils;
 
 fn main() -> Result<()> {
@@ -39,7 +40,7 @@ fn main() -> Result<()> {
         Some("ci") => gates::ci(&sh),
         Some("fix") => gates::fix(&sh),
         Some("pre-commit") => gates::pre_commit(&sh),
-        Some("pre-push") => gates::pre_push(&sh),
+        Some("pre-push") => rustqual::pre_push(&sh),
         Some("publish") => {
             let from = {
                 let args: Vec<String> = env::args().collect();
