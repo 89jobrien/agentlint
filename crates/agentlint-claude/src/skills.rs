@@ -116,15 +116,14 @@ fn validate_name(path: &Path, fields: &[Field], diagnostics: &mut Vec<Diagnostic
         .parent()
         .and_then(|p| p.file_name())
         .and_then(|n| n.to_str())
+        && name != dir_name
     {
-        if name != dir_name {
-            diagnostics.push(Diagnostic::error(
-                path,
-                field.line,
-                1,
-                format!("'name' ({name}) must match the skill directory name ({dir_name})"),
-            ));
-        }
+        diagnostics.push(Diagnostic::error(
+            path,
+            field.line,
+            1,
+            format!("'name' ({name}) must match the skill directory name ({dir_name})"),
+        ));
     }
 }
 
