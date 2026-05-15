@@ -36,7 +36,8 @@ fn main() {
         Box::new(agentlint_claude::ClaudeValidator),
         Box::new(agentlint_cursor::CursorValidator),
         Box::new(agentlint_codex::CodexValidator),
-        Box::new(agentlint_opencode::OpenCodeValidator),
+        Box::new(agentlint_opencode::AgentsMarkdownValidator),
+        Box::new(agentlint_opencode::OpenCodeJsonValidator),
         Box::new(agentlint_gemini::GeminiValidator),
         Box::new(agentlint_pi::PiValidator),
     ];
