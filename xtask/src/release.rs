@@ -6,13 +6,15 @@ use anyhow::{Context, Result};
 use std::path::Path;
 use xshell::{Shell, cmd};
 
+use crate::utils::parse_workspace_version;
+
 pub fn release(sh: &Shell, root: &Path, level: &str) -> Result<()> {
     // 1. Bump workspace version.
     crate::bump::bump(root, level)?;
 
     // 2. Read the new version.
     let manifest = std::fs::read_to_string(root.join("Cargo.toml"))?;
-    let version = crate::bump::parse_workspace_version(&manifest)
+    let version = parse_workspace_version(&manifest)
         .ok_or_else(|| anyhow::anyhow!("could not read version after bump"))?;
     let tag = format!("v{version}");
 

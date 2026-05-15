@@ -20,6 +20,7 @@ mod detect_changes;
 mod gates;
 mod publish;
 mod release;
+mod utils;
 
 fn main() -> Result<()> {
     let task = env::args().nth(1);

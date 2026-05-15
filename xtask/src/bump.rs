@@ -5,6 +5,8 @@
 use anyhow::{Result, bail};
 use std::{fs, path::Path};
 
+use crate::utils::{parse_semver, parse_workspace_version};
+
 pub fn bump(root: &Path, level: &str) -> Result<()> {
     let manifest = root.join("Cargo.toml");
     let content = fs::read_to_string(&manifest)?;
@@ -31,37 +33,4 @@ pub fn bump(root: &Path, level: &str) -> Result<()> {
     fs::write(&manifest, updated)?;
     println!("version bumped {current} → {next}");
     Ok(())
-}
-
-pub fn parse_workspace_version(content: &str) -> Option<String> {
-    let mut in_section = false;
-    for line in content.lines() {
-        let t = line.trim();
-        if t == "[workspace.package]" {
-            in_section = true;
-            continue;
-        }
-        if in_section {
-            if t.starts_with('[') {
-                break;
-            }
-            if let Some(v) = t
-                .strip_prefix("version = \"")
-                .and_then(|v| v.strip_suffix('"'))
-            {
-                return Some(v.to_string());
-            }
-        }
-    }
-    None
-}
-
-const SEMVER_PARTS: usize = 3;
-
-fn parse_semver(v: &str) -> Result<(u64, u64, u64)> {
-    let p: Vec<&str> = v.split('.').collect();
-    if p.len() != SEMVER_PARTS {
-        bail!("version {v:?} is not semver");
-    }
-    Ok((p[0].parse()?, p[1].parse()?, p[2].parse()?))
 }
