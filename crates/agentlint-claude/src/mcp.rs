@@ -3,6 +3,100 @@ use std::path::Path;
 
 pub struct McpValidator;
 
+/// Returns `true` when `s` looks like a hardcoded secret.
+///
+/// Heuristic: length > 20, no spaces, not starting with `$` (env var ref),
+/// not an `op://` ref, and not all-lowercase (to avoid flagging path/name strings).
+pub(crate) fn looks_like_plaintext_secret(s: &str) -> bool {
+    if s.len() <= 20 {
+        return false;
+    }
+    if s.contains(' ') {
+        return false;
+    }
+    if s.starts_with('$') {
+        return false;
+    }
+    if s.starts_with("op://") {
+        return false;
+    }
+    // All-lowercase strings are likely paths or config names, not secrets.
+    if s.chars()
+        .all(|c| c.is_lowercase() || c == '-' || c == '_' || c == '/' || c == '.')
+    {
+        return false;
+    }
+    true
+}
+
+/// Scan raw JSON text for duplicate keys inside the `mcpServers` object.
+///
+/// Because `serde_json` silently drops duplicate keys, we scan the raw source.
+/// Returns a list of duplicated server names.
+pub(crate) fn find_duplicate_server_names(src: &str) -> Vec<String> {
+    // Find the mcpServers block start.
+    let key_pat = "\"mcpServers\"";
+    let Some(kpos) = src.find(key_pat) else {
+        return vec![];
+    };
+    let after_key = &src[kpos + key_pat.len()..];
+    // Skip whitespace and the colon.
+    let after_colon = after_key.trim_start().trim_start_matches(':').trim_start();
+    if !after_colon.starts_with('{') {
+        return vec![];
+    }
+
+    // Collect top-level string keys inside this object (depth == 1 only).
+    let mut names: Vec<String> = Vec::new();
+    let mut duplicates: Vec<String> = Vec::new();
+    let mut depth: i32 = 0;
+    let chars: Vec<char> = after_colon.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        match chars[i] {
+            '{' | '[' => {
+                depth += 1;
+                i += 1;
+            }
+            '}' | ']' => {
+                depth -= 1;
+                if depth == 0 {
+                    break;
+                }
+                i += 1;
+            }
+            '"' if depth == 1 => {
+                // Parse a JSON string key.
+                i += 1;
+                let mut key = String::new();
+                while i < chars.len() && chars[i] != '"' {
+                    if chars[i] == '\\' {
+                        i += 1; // skip escaped char
+                    }
+                    if i < chars.len() {
+                        key.push(chars[i]);
+                    }
+                    i += 1;
+                }
+                i += 1; // closing quote
+                // Only count this as a server name if the next non-whitespace char is `:`.
+                let rest: String = chars[i..].iter().collect();
+                if rest.trim_start().starts_with(':') {
+                    if names.contains(&key) && !duplicates.contains(&key) {
+                        duplicates.push(key.clone());
+                    } else {
+                        names.push(key);
+                    }
+                }
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+    duplicates
+}
+
 /// Known keys inside a server entry object.
 const KNOWN_SERVER_KEYS: &[&str] = &["command", "args", "env", "type", "url", "headers"];
 
@@ -111,23 +205,37 @@ pub fn validate_server_entry(
 
     if let Some(env) = server.get("env").and_then(|v| v.as_object()) {
         for (key, val) in env {
-            if let Some(s) = val.as_str()
-                && s.starts_with("op://")
-            {
-                diags.push(
-                    Diagnostic::warning(
-                        path,
-                        1,
-                        1,
-                        format!(
-                            "mcpServers.{name}.env.{key}: op:// URI will not \
-                             resolve in Claude's shell context; use \
-                             'apiKeyHelper' in settings.json or pre-resolve \
-                             the secret before launch"
-                        ),
-                    )
-                    .with_rule("claude/mcp/op-uri-in-env", Difficulty::Hard),
-                );
+            if let Some(s) = val.as_str() {
+                if s.starts_with("op://") {
+                    diags.push(
+                        Diagnostic::warning(
+                            path,
+                            1,
+                            1,
+                            format!(
+                                "mcpServers.{name}.env.{key}: op:// URI will not \
+                                 resolve in Claude's shell context; use \
+                                 'apiKeyHelper' in settings.json or pre-resolve \
+                                 the secret before launch"
+                            ),
+                        )
+                        .with_rule("claude/mcp/op-uri-in-env", Difficulty::Hard),
+                    );
+                } else if looks_like_plaintext_secret(s) {
+                    diags.push(
+                        Diagnostic::error(
+                            path,
+                            1,
+                            1,
+                            format!(
+                                "mcpServers.{name}.env.{key}: value looks like a \
+                                 hardcoded secret; use an op:// ref or a \
+                                 $ENV_VAR reference instead"
+                            ),
+                        )
+                        .with_rule("claude/settings/mcp-plaintext-secret", Difficulty::Easy),
+                    );
+                }
             }
         }
     }
@@ -170,6 +278,22 @@ impl McpValidator {
         };
 
         let mut diags = Vec::new();
+
+        // Check for duplicate server names in raw JSON (serde deduplicates silently).
+        for name in find_duplicate_server_names(src) {
+            diags.push(
+                Diagnostic::warning(
+                    path,
+                    1,
+                    1,
+                    format!(
+                        "mcpServers.{name}: duplicate server name; \
+                         the last entry silently wins — remove the duplicate"
+                    ),
+                )
+                .with_rule("claude/settings/mcp-duplicate-server", Difficulty::Hard),
+            );
+        }
 
         let servers = match obj.get("mcpServers").and_then(|v| v.as_object()) {
             Some(s) => s,
@@ -356,6 +480,83 @@ mod tests {
             }
         }"#;
         assert_clean(&McpValidator::validate(Path::new(PATH), src));
+    }
+
+    #[test]
+    fn duplicate_server_name_is_warning() {
+        let src = r#"{"mcpServers": {"alpha": {"command": "npx"}, "alpha": {"command": "node"}}}"#;
+        let diags = McpValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/mcp-duplicate-server"
+                    && d.severity == agentlint_core::Severity::Warning),
+            "expected mcp-duplicate-server warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn unique_server_names_no_duplicate_warning() {
+        let src = r#"{"mcpServers": {"alpha": {"command": "npx"}, "beta": {"command": "node"}}}"#;
+        let diags = McpValidator::validate(Path::new(PATH), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/mcp-duplicate-server"),
+            "unexpected duplicate warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn plaintext_secret_in_env_is_error() {
+        let src = r#"{
+            "mcpServers": {
+                "s": {
+                    "command": "node",
+                    "env": {"API_KEY": "xXxFAKETOKENxXxABCDEFGHIJKLMNOP1234567"}
+                }
+            }
+        }"#;
+        let diags = McpValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/mcp-plaintext-secret"
+                    && d.severity == agentlint_core::Severity::Error),
+            "expected mcp-plaintext-secret error, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn env_var_ref_is_clean() {
+        let src = r#"{
+            "mcpServers": {
+                "s": {
+                    "command": "node",
+                    "env": {"API_KEY": "$MY_API_KEY"}
+                }
+            }
+        }"#;
+        assert_clean(&McpValidator::validate(Path::new(PATH), src));
+    }
+
+    #[test]
+    fn op_ref_in_env_not_flagged_as_plaintext_secret() {
+        let src = r#"{
+            "mcpServers": {
+                "s": {
+                    "command": "node",
+                    "env": {"API_KEY": "op://Personal/item/field"}
+                }
+            }
+        }"#;
+        let diags = McpValidator::validate(Path::new(PATH), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/mcp-plaintext-secret"),
+            "op:// ref should not be flagged as plaintext, got: {diags:?}"
+        );
     }
 
     #[test]
