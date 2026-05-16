@@ -3,21 +3,19 @@ use std::path::Path;
 
 pub struct HooksValidator;
 
-/// Extensions that are never executable hook scripts — config, docs, data.
-const NON_SCRIPT_EXTENSIONS: &[&str] = &[
-    // Config / data
-    "json", "yaml", "yml", "toml", "lock", // Docs
-    "md", "txt", "rst", // Compiled source (not directly executable as hook scripts)
-    "rs", "go", "c", "cpp", "h", "hpp",
+/// Extensions that identify directly-executable hook scripts.
+/// Files with no extension are also validated (bare executables).
+/// Anything else in a hooks/ dir is skipped (config, docs, compiled source, etc.).
+const SCRIPT_EXTENSIONS: &[&str] = &[
+    "sh", "bash", "zsh", "fish", "nu", "py", "rb", "pl", "ts", "js",
 ];
 
 impl HooksValidator {
     pub fn validate(path: &Path, src: &str) -> Vec<Diagnostic> {
-        // Config files, docs, and data files in a hooks/ dir are not hook scripts.
-        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-            if NON_SCRIPT_EXTENSIONS.contains(&ext) {
-                return vec![];
-            }
+        // Only validate known script types or bare files (no extension).
+        match path.extension().and_then(|e| e.to_str()) {
+            Some(ext) if !SCRIPT_EXTENSIONS.contains(&ext) => return vec![],
+            _ => {}
         }
 
         let mut diags = Vec::new();
