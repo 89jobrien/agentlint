@@ -31,7 +31,7 @@ const MAX_HOOKS_PER_MATCHER: usize = 7;
 /// Matched against the full command string regardless of absolute prefix.
 const WARN_PATTERNS: &[(&str, &str)] = &[
     (
-        "cargo",
+        "cargo ",
         "invokes the Rust compiler on every hook call; consolidate or use a git hook instead",
     ),
     (
@@ -98,6 +98,21 @@ impl SettingsValidator {
             }
         }
 
+        // skipDangerousModePermissionPrompt: true disables all permission prompts globally.
+        if obj
+            .get("skipDangerousModePermissionPrompt")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            diags.push(Diagnostic::warning(
+                path,
+                1,
+                1,
+                "skipDangerousModePermissionPrompt is true: all permission prompts are \
+                 disabled globally; consider scoping with permissions.allow instead",
+            ));
+        }
+
         // permissions.allow / permissions.deny must be arrays of strings.
         if let Some(perms) = obj.get("permissions").and_then(|v| v.as_object()) {
             for &field in &["allow", "deny"] {
@@ -110,6 +125,15 @@ impl SettingsValidator {
                         1,
                         format!("permissions.{field} must be an array of strings"),
                     ));
+                }
+            }
+
+            // Inspect individual allow entries for dangerous patterns.
+            if let Some(allow) = perms.get("allow").and_then(|v| v.as_array()) {
+                for entry in allow {
+                    if let Some(s) = entry.as_str() {
+                        check_allow_entry(path, s, &mut diags);
+                    }
                 }
             }
         }
@@ -202,6 +226,79 @@ impl SettingsValidator {
 
         diags
     }
+}
+
+/// Inspect a single `permissions.allow` entry string for dangerous patterns.
+///
+/// Entry format: `TOOL(SPEC)` e.g. `Bash(git add:*)`, `Read(//Users/joe/**)`.
+fn check_allow_entry(path: &Path, entry: &str, diags: &mut Vec<Diagnostic>) {
+    if entry.starts_with("Bash(") {
+        // Hardcoded credentials via sshpass.
+        if entry.contains("sshpass -p") {
+            diags.push(Diagnostic::error(
+                path,
+                1,
+                1,
+                "permissions.allow contains 'sshpass -p': hardcoded credential in allow list; \
+                 use SSH key authentication instead",
+            ));
+        }
+        // Sleep blocks the agent between tool calls.
+        if entry.contains("sleep ") {
+            diags.push(Diagnostic::error(
+                path,
+                1,
+                1,
+                "permissions.allow Bash entry contains 'sleep': sleeping in an allow rule \
+                 stalls the agent; remove or move to an async process",
+            ));
+        }
+        // Baked-in CI workflow modifications are stale one-off allowances.
+        if entry.contains(".github/workflows") {
+            diags.push(Diagnostic::warning(
+                path,
+                1,
+                1,
+                "permissions.allow Bash entry references .github/workflows: CI workflow \
+                 modifications should not be permanently baked into the allow list",
+            ));
+        }
+    }
+
+    if entry.starts_with("Read(") && entry.contains("**") {
+        // Extract the path spec from Read(...).
+        let inner = entry
+            .strip_prefix("Read(")
+            .unwrap_or("")
+            .trim_end_matches(')');
+        if is_broad_read_path(inner) {
+            diags.push(Diagnostic::warning(
+                path,
+                1,
+                1,
+                format!(
+                    "permissions.allow Read({inner}) grants broad filesystem read access; \
+                     scope to a specific project directory"
+                ),
+            ));
+        }
+    }
+}
+
+/// Returns true when a Read permission path covers a broad area of the filesystem.
+///
+/// Paths with ≤3 concrete (non-wildcard) components after stripping leading slashes
+/// and the trailing `/**` are considered broad — e.g. `//Users/joe/**` (home dir) or
+/// `//Users/joe/dev/**` (entire dev tree). Deeper paths like `//Users/joe/dev/myproject/**`
+/// are acceptable.
+fn is_broad_read_path(spec: &str) -> bool {
+    let stripped = spec.trim_start_matches('/');
+    let without_glob = stripped.trim_end_matches("/**");
+    let concrete_parts = without_glob
+        .split('/')
+        .filter(|p| !p.is_empty() && !p.contains('*'))
+        .count();
+    concrete_parts <= 3
 }
 
 fn is_array_of_strings(v: &serde_json::Value) -> bool {
@@ -324,7 +421,7 @@ mod tests {
 
     #[test]
     fn hook_with_cargo_is_warning() {
-        let src = r#"{"hooks":{"PreToolUse":[{"matcher":"Edit","hooks":[{"type":"command","command":"/home/user/.cargo/bin/cargo clippy"}]}]}}"#;
+        let src = r#"{"hooks":{"PreToolUse":[{"matcher":"Edit","hooks":[{"type":"command","command":"cargo clippy --workspace"}]}]}}"#;
         let diags = SettingsValidator::validate(Path::new(PATH), src);
         assert!(
             diags
@@ -334,6 +431,96 @@ mod tests {
             "expected cargo warning, got: {diags:?}"
         );
     }
+
+    // --- permissions.allow content checks ---
+
+    #[test]
+    fn skip_dangerous_mode_true_is_warning() {
+        let src = r#"{"skipDangerousModePermissionPrompt": true}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.message.contains("skipDangerousModePermissionPrompt")
+                    && d.severity == agentlint_core::Severity::Warning),
+            "expected warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn skip_dangerous_mode_false_is_clean() {
+        let src = r#"{"skipDangerousModePermissionPrompt": false}"#;
+        assert_clean(&SettingsValidator::validate(Path::new(PATH), src));
+    }
+
+    #[test]
+    fn allow_sshpass_credential_is_error() {
+        let src = r#"{"permissions": {"allow": ["Bash(sshpass -p 'secret' ssh user@host)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags.iter().any(|d| d.message.contains("sshpass -p")
+                && d.severity == agentlint_core::Severity::Error),
+            "expected credential error, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn allow_sleep_bash_is_error() {
+        let src = r#"{"permissions": {"allow": ["Bash(sleep 30 && curl http://localhost)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.message.contains("sleep")
+                    && d.severity == agentlint_core::Severity::Error),
+            "expected sleep error, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn allow_ci_workflow_modification_is_warning() {
+        let src =
+            r#"{"permissions": {"allow": ["Bash(tee /repo/.github/workflows/ci.yml << 'EOF')"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags.iter().any(|d| d.message.contains(".github/workflows")
+                && d.severity == agentlint_core::Severity::Warning),
+            "expected CI workflow warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn allow_broad_home_read_is_warning() {
+        let src = r#"{"permissions": {"allow": ["Read(//Users/joe/**)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.message.contains("broad filesystem read")
+                    && d.severity == agentlint_core::Severity::Warning),
+            "expected broad read warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn allow_broad_dev_tree_read_is_warning() {
+        let src = r#"{"permissions": {"allow": ["Read(//Users/joe/dev/**)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.message.contains("broad filesystem read")),
+            "expected broad read warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn allow_specific_project_read_is_clean() {
+        let src = r#"{"permissions": {"allow": ["Read(//Users/joe/dev/myproject/**)"]}}"#;
+        assert_clean(&SettingsValidator::validate(Path::new(PATH), src));
+    }
+
+    // --- hooks structural checks ---
 
     #[test]
     fn hooks_missing_hooks_array_is_error() {
