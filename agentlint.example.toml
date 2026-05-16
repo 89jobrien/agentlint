@@ -145,3 +145,77 @@ difficulty = "hard"
 # [[ignore]]
 # path  = ".claude/settings.automation.json"
 # rules = ["claude/settings/skip-dangerous-mode", "claude/settings/too-many-hooks"]
+
+# ---------------------------------------------------------------------------
+# [docs] — docs/**/*.md frontmatter schema (agentlint-docs validator)
+#
+# Controls which files are scanned and what frontmatter is required.
+# All fields are optional — omit the entire section to use the defaults.
+# ---------------------------------------------------------------------------
+
+# [docs]
+
+# Glob pattern used to discover doc files.
+# Default: "docs/**/*.md"
+# file_glob = "docs/**/*.md"
+
+# Frontmatter fields that must be present and non-empty.
+# Default: ["title", "doctype", "project", "status", "created", "updated"]
+# required_fields = ["title", "doctype", "project", "status", "created", "updated"]
+
+# Allowed values for the `doctype` field.
+# Default: ["idea", "spec", "plan", "adr", "roadmap", "guide", "reference",
+#           "runbook", "architecture", "capability-matrix", "testing",
+#           "development", "readme"]
+# doctypes = ["spec", "plan", "adr", "guide", "reference"]
+
+# Allowed values for the `status` field.
+# Default: ["draft", "active", "archived", "superseded"]
+# statuses = ["draft", "active", "archived", "superseded"]
+
+# Fields whose values must be YYYY-MM-DD dates.
+# Default: ["created", "updated"]
+# date_fields = ["created", "updated"]
+
+# ---------------------------------------------------------------------------
+# [[docs.conventions]] — filename convention rules
+#
+# Each entry is a template with {token} placeholders. Conventions are tried
+# in order — the first match wins. Dir-scoped entries (with `dirs`) should
+# come before catch-all entries (no `dirs`), otherwise the catch-all will
+# shadow them.
+#
+# Supported tokens:
+#   {doctype}  — maps to the `doctype` frontmatter field
+#   {project}  — maps to the `project` frontmatter field
+#   {topic}    — free-form slug (no frontmatter constraint)
+#   {ref}      — leading date or ticket prefix (e.g. 20260516 or 2026-05-15)
+#   {status}   — maps to the `status` frontmatter field
+#
+# Defaults (in priority order):
+#
+#   1. Research docs in ideas/specs/plans/ with explicit doctype suffix:
+#      [[docs.conventions]]
+#      dirs   = ["ideas", "specs", "plans"]
+#      format = "{ref}-{topic}.{doctype}.md"
+#
+#   2. Research docs in ideas/specs/plans/ without explicit doctype suffix
+#      (doctype inferred from directory name):
+#      [[docs.conventions]]
+#      dirs   = ["ideas", "specs", "plans"]
+#      format = "{ref}-{topic}.md"
+#
+#   3. Catch-all repo doc (any directory):
+#      [[docs.conventions]]
+#      format = "{doctype}.{project}.md"
+#
+# To replace the defaults entirely, supply your own [[docs.conventions]] list.
+# ---------------------------------------------------------------------------
+
+# Example: project-specific convention set
+# [[docs.conventions]]
+# dirs   = ["specs", "plans"]
+# format = "{ref}-{topic}.{doctype}.md"
+#
+# [[docs.conventions]]
+# format = "{doctype}.{project}.md"
