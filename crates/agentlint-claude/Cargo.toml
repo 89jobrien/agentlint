@@ -9,10 +9,10 @@ publish.workspace = true
 description = "agentlint validator for Claude Code agent harness files (agents, skills, commands, hooks, settings)"
 
 [dependencies]
-agentlint-core        = { path = "../agentlint-core",        version = "0.1.0" }
-agentlint-frontmatter = { path = "../agentlint-frontmatter", version = "0.1.0" }
+agentlint-core        = { path = "../agentlint-core",        version = "0.2.0" }
+agentlint-frontmatter = { path = "../agentlint-frontmatter", version = "0.2.0" }
 serde_json            = "1"
 
 [dev-dependencies]
-agentlint-core = { path = "../agentlint-core", version = "0.1.0", features = ["test-utils"] }
+agentlint-core = { path = "../agentlint-core", version = "0.2.0", features = ["test-utils"] }
 tempfile       = "3"

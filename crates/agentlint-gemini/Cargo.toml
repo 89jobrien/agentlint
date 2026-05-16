@@ -9,4 +9,4 @@ publish.workspace = true
 description = "agentlint validator for Google Gemini GEMINI.md files"
 
 [dependencies]
-agentlint-core = { path = "../agentlint-core", version = "0.1.0" }
+agentlint-core = { path = "../agentlint-core", version = "0.2.0" }

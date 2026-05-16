@@ -14,7 +14,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2024"
-version = "0.1.1"
+version = "0.2.0"
 license = "MIT OR Apache-2.0"
 authors = ["Joseph O'Brien"]
 repository = "https://github.com/89jobrien/agentlint"
@@ -35,11 +35,11 @@ name = "agentlint"
 path = "src/main.rs"
 
 [dependencies]
-agentlint-core     = { path = "crates/agentlint-core",     version = "0.1.0", features = ["config"] }
-agentlint-claude   = { path = "crates/agentlint-claude",   version = "0.1.0" }
-agentlint-cursor   = { path = "crates/agentlint-cursor",   version = "0.1.0" }
-agentlint-codex    = { path = "crates/agentlint-codex",    version = "0.1.0" }
-agentlint-opencode = { path = "crates/agentlint-opencode", version = "0.1.0" }
-agentlint-gemini   = { path = "crates/agentlint-gemini",   version = "0.1.0" }
-agentlint-pi       = { path = "crates/agentlint-pi",       version = "0.1.0" }
+agentlint-core     = { path = "crates/agentlint-core",     version = "0.2.0", features = ["config"] }
+agentlint-claude   = { path = "crates/agentlint-claude",   version = "0.2.0" }
+agentlint-cursor   = { path = "crates/agentlint-cursor",   version = "0.2.0" }
+agentlint-codex    = { path = "crates/agentlint-codex",    version = "0.2.0" }
+agentlint-opencode = { path = "crates/agentlint-opencode", version = "0.2.0" }
+agentlint-gemini   = { path = "crates/agentlint-gemini",   version = "0.2.0" }
+agentlint-pi       = { path = "crates/agentlint-pi",       version = "0.2.0" }
 clap               = { version = "4", features = ["derive"] }
