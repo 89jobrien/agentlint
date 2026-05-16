@@ -1,11 +1,16 @@
-# agentlint roadmap
-
-**Status**: active
-**Author**: Joseph O'Brien
-**Created**: 2026-05-16
-**Updated**: 2026-05-16
-
 ---
+title: agentlint-roadmap
+doctype: roadmap
+project: agentlint
+status: active
+created: 2026-05-16
+updated: 2026-05-16
+meta: |
+  author: Joseph O'Brien
+  version: 0.1.0
+---
+
+# agentlint roadmap
 
 Tracks shipped milestones and planned work. Issues are on GitHub; this file captures the
 high-level narrative.

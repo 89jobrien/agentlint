@@ -78,6 +78,7 @@ fn main() {
         Box::new(agentlint_opencode::OpenCodeJsonValidator),
         Box::new(agentlint_gemini::GeminiValidator),
         Box::new(agentlint_pi::PiValidator),
+        Box::new(agentlint_docs::DocsValidator),
     ];
 
     let result = run(&roots, &validators, &config);

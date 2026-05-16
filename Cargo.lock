@@ -10,6 +10,7 @@ dependencies = [
  "agentlint-codex",
  "agentlint-core",
  "agentlint-cursor",
+ "agentlint-docs",
  "agentlint-gemini",
  "agentlint-opencode",
  "agentlint-pi",
@@ -46,6 +47,14 @@ dependencies = [
 
 [[package]]
 name = "agentlint-cursor"
+version = "0.5.0"
+dependencies = [
+ "agentlint-core",
+ "agentlint-frontmatter",
+]
+
+[[package]]
+name = "agentlint-docs"
 version = "0.5.0"
 dependencies = [
  "agentlint-core",

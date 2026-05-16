@@ -1,0 +1,13 @@
+[package]
+name = "agentlint-docs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "agentlint validator for docs/**/*.md frontmatter"
+
+[dependencies]
+agentlint-core        = { workspace = true }
+agentlint-frontmatter = { workspace = true }

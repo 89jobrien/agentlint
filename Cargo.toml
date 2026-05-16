@@ -8,6 +8,7 @@ members = [
     "crates/agentlint-opencode",
     "crates/agentlint-gemini",
     "crates/agentlint-pi",
+    "crates/agentlint-docs",
     "xtask",
 ]
 resolver = "2"
@@ -30,6 +31,7 @@ agentlint-codex       = { path = "crates/agentlint-codex",       version = "0.5.
 agentlint-opencode    = { path = "crates/agentlint-opencode",    version = "0.5.0" }
 agentlint-gemini      = { path = "crates/agentlint-gemini",      version = "0.5.0" }
 agentlint-pi          = { path = "crates/agentlint-pi",          version = "0.5.0" }
+agentlint-docs        = { path = "crates/agentlint-docs",        version = "0.5.0" }
 # External shared deps
 clap       = { version = "4",   features = ["derive"] }
 nom        = "7"
@@ -62,4 +64,5 @@ agentlint-codex    = { workspace = true }
 agentlint-opencode = { workspace = true }
 agentlint-gemini   = { workspace = true }
 agentlint-pi       = { workspace = true }
+agentlint-docs     = { workspace = true }
 clap               = { workspace = true }
