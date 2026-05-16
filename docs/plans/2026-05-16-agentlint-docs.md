@@ -14,18 +14,40 @@ documentation so that doc structure is machine-checkable.
 
 ---
 
-## Filename Convention
+## Filename Conventions
+
+Two conventions are supported, selected by the file's location:
+
+### Repo docs — `docs/{doctype}.{stub}.md`
+
+Bound to a project. The `doctype` is explicit in the filename.
 
 ```
-docs/{doctype}.{stub}.md
+docs/roadmap.agentlint.md   → doctype=roadmap, stub=agentlint, id=agentlint-roadmap
+docs/architecture.agentlint.md
 ```
 
-- `doctype` — document type; must be one of the known enum values (see below)
-- `stub` — project or topic identifier; treated as the project name mechanically
-- Derived `id` = `{stub}-{doctype}` (e.g. `roadmap.agentlint.md` → `agentlint-roadmap`)
+### Research docs — `docs/{dir}/{YYYYMMDD}-{topic}.{doctype}.md`
+
+Scoped to a topic or ticket. Directory provides an additional path-inference fallback:
+
+| Directory     | Inferred doctype if suffix absent |
+| ------------- | --------------------------------- |
+| `docs/ideas/` | `idea`                            |
+| `docs/specs/` | `spec`                            |
+| `docs/plans/` | `plan`                            |
+
+```
+docs/ideas/20260516-agentlint-docs.idea.md  → doctype=idea, topic=agentlint-docs
+docs/specs/20260516-agentlint-docs.spec.md  → doctype=spec, topic=agentlint-docs
+docs/plans/20260516-agentlint-docs.plan.md  → doctype=plan, topic=agentlint-docs
+```
+
+Legacy files without an explicit doctype suffix (e.g. `docs/plans/2026-05-15-agentlint.md`)
+are inferred by directory and skipped if they have no frontmatter fence.
 
 Files under `docs/` that do not start with a frontmatter fence (`---`) are silently skipped.
-Files that do not match the `{doctype}.{stub}.md` pattern emit a filename-format warning.
+Files that match neither pattern emit a `docs/frontmatter/invalid-filename` warning.
 
 ---
 
