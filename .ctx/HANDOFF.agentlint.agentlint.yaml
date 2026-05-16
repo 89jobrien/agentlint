@@ -1,33 +1,38 @@
 project: agentlint
 id: agentlint
-updated: 2026-05-15
-items:
-  - id: remaining-validators
-    doob_uuid: null
-    name: remaining-validators
-    priority: P3
-    status: open
-    title: Gaps — .mcp.json validator, broader permissions.allow linting
-    description: |-
-      Potential next work:
-      - .mcp.json validator (MCP server config — validate server entries, env refs)
-      - permissions.allow stale one-off entries (many hardcoded one-shot Bash allows)
-      - Cursor/Codex/OpenCode validators need more coverage
-      - agentlint rule: detect naive str-contains hook patterns in hook scripts
-        (flag hooks that don't parse command pipelines before matching)
-    files: []
-    completed: null
-    extra: []
+updated: 20260516.001948
+items: []
 log:
-  - date: 20260516::213000
+  - date: 20260516.001948
+    session: 4
+    summary: >-
+      shipped v0.4.0: broad-bash-allow (#47), cursor never-fires (#48),
+      cursor unknown-key (#49), codex no-commands-section (#50); all issues closed;
+      225 tests passing
+    commits:
+      - sha: 65e5995
+        branch: main
+      - sha: d268a9f
+        branch: main
+      - sha: b1ff07d
+        branch: main
+      - sha: 12ace45
+        branch: main
+      - sha: f0001af
+        branch: main
+  - date: 20260516.213000
+    session: 3
     summary: done=3 running=0 pending=1 blocked=0
     commits: []
+  - date: 20260516.003707
     session: 2
-  - date: 20260516::003707
     summary: done=1 running=0 pending=5 blocked=0
     commits: []
+  - date: 20260515.223403
     session: 1
-  - date: 20260515::223403
-    summary: "False-positive reduction pass: binary file skip, YAML quote stripping, namespaced skill names, hooks extension allowlist, drop plugin-repo layout detection, per-rule dedup in settings, .maestro skip dir, pretty output format with TTY auto-detect, --version flag, installed to PATH"
+    summary: >-
+      False-positive reduction pass: binary file skip, YAML quote stripping,
+      namespaced skill names, hooks extension allowlist, drop plugin-repo layout
+      detection, per-rule dedup in settings, .maestro skip dir, pretty output
+      format with TTY auto-detect, --version flag, installed to PATH
     commits: []
-    session: 3
