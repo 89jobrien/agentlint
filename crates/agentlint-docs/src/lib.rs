@@ -3,6 +3,8 @@ use agentlint_frontmatter::{ParseError, parse};
 use serde::Deserialize;
 use std::path::Path;
 
+const DEFAULT_CONVENTIONS_JSON: &str = include_str!("../schemas/conventions.default.json");
+
 // ---------------------------------------------------------------------------
 // FilenameConvention — configurable naming format
 // ---------------------------------------------------------------------------
@@ -210,24 +212,8 @@ impl Default for DocsSchema {
                 "superseded".into(),
             ],
             date_fields: vec!["created".into(), "updated".into()],
-            conventions: vec![
-                // Dir-scoped conventions come first so they take priority over
-                // the catch-all repo doc convention for files in those dirs.
-                FilenameConvention {
-                    format: "{ref}-{topic}.{doctype}.md".into(),
-                    dirs: vec!["ideas".into(), "specs".into(), "plans".into()],
-                },
-                // Fallback for research docs with no explicit doctype suffix.
-                FilenameConvention {
-                    format: "{ref}-{topic}.md".into(),
-                    dirs: vec!["ideas".into(), "specs".into(), "plans".into()],
-                },
-                // Catch-all repo doc convention.
-                FilenameConvention {
-                    format: "{doctype}.{project}.md".into(),
-                    dirs: vec![],
-                },
-            ],
+            conventions: serde_json::from_str(DEFAULT_CONVENTIONS_JSON)
+                .expect("bundled conventions.default.json is valid"),
         }
     }
 }
