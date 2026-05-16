@@ -3,8 +3,23 @@ use std::path::Path;
 
 pub struct HooksValidator;
 
+/// Extensions that are never executable hook scripts — config, docs, data.
+const NON_SCRIPT_EXTENSIONS: &[&str] = &[
+    // Config / data
+    "json", "yaml", "yml", "toml", "lock", // Docs
+    "md", "txt", "rst", // Compiled source (not directly executable as hook scripts)
+    "rs", "go", "c", "cpp", "h", "hpp",
+];
+
 impl HooksValidator {
     pub fn validate(path: &Path, src: &str) -> Vec<Diagnostic> {
+        // Config files, docs, and data files in a hooks/ dir are not hook scripts.
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            if NON_SCRIPT_EXTENSIONS.contains(&ext) {
+                return vec![];
+            }
+        }
+
         let mut diags = Vec::new();
 
         // Must have a shebang on line 1.
