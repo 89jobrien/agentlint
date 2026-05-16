@@ -34,39 +34,39 @@ pub fn validate_server_entry(
         );
     }
 
-    if let Some(cmd) = server.get("command").and_then(|v| v.as_str()) {
-        if cmd.trim().is_empty() {
-            diags.push(
-                Diagnostic::error(
-                    path,
-                    1,
-                    1,
-                    format!("mcpServers.{name}: 'command' must not be empty"),
-                )
-                .with_rule("claude/mcp/empty-command", Difficulty::Easy),
-            );
-        }
+    if server
+        .get("command")
+        .and_then(|v| v.as_str())
+        .is_some_and(|cmd| cmd.trim().is_empty())
+    {
+        diags.push(
+            Diagnostic::error(
+                path,
+                1,
+                1,
+                format!("mcpServers.{name}: 'command' must not be empty"),
+            )
+            .with_rule("claude/mcp/empty-command", Difficulty::Easy),
+        );
     }
 
     if let Some(env) = server.get("env").and_then(|v| v.as_object()) {
         for (key, val) in env {
-            if let Some(s) = val.as_str() {
-                if s.starts_with("op://") {
-                    diags.push(
-                        Diagnostic::warning(
-                            path,
-                            1,
-                            1,
-                            format!(
-                                "mcpServers.{name}.env.{key}: op:// URI will not \
-                                 resolve in Claude's shell context; use \
-                                 'apiKeyHelper' in settings.json or pre-resolve \
-                                 the secret before launch"
-                            ),
-                        )
-                        .with_rule("claude/mcp/op-uri-in-env", Difficulty::Hard),
-                    );
-                }
+            if val.as_str().is_some_and(|s| s.starts_with("op://")) {
+                diags.push(
+                    Diagnostic::warning(
+                        path,
+                        1,
+                        1,
+                        format!(
+                            "mcpServers.{name}.env.{key}: op:// URI will not \
+                             resolve in Claude's shell context; use \
+                             'apiKeyHelper' in settings.json or pre-resolve \
+                             the secret before launch"
+                        ),
+                    )
+                    .with_rule("claude/mcp/op-uri-in-env", Difficulty::Hard),
+                );
             }
         }
     }
