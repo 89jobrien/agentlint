@@ -17,10 +17,11 @@ enum ClaudeFileKind {
 
 /// Classify a path into its Claude harness file kind by walking components.
 ///
-/// Expects paths of the form `.claude/<kind>/...` or `.claude/settings.json`.
-/// Returns `None` for paths that don't match any known shape, preventing false
-/// positives from substring matches (e.g. `.claude/agents-backup/` would not
-/// match `Agent` here).
+/// Handles two layouts:
+/// - Installed: `.claude/<kind>/...` or `.claude/settings.json`
+/// - Plugin repo: bare `agents/`, `skills/`, `commands/`, `hooks/` at root
+///
+/// Returns `None` for paths that don't match any known shape.
 fn claude_file_kind(path: &Path) -> Option<ClaudeFileKind> {
     let mut components = path.components().peekable();
 
@@ -32,19 +33,37 @@ fn claude_file_kind(path: &Path) -> Option<ClaudeFileKind> {
         components.next();
     }
 
-    // Find the `.claude` component anywhere in the path (handles absolute or
-    // relative paths with a prefix).
     let comps: Vec<_> = components.collect();
-    let claude_pos = comps.iter().position(|c| c.as_os_str() == ".claude")?;
 
-    match comps.get(claude_pos + 1)?.as_os_str().to_str()? {
-        "agents" => Some(ClaudeFileKind::Agent),
-        "skills" => Some(ClaudeFileKind::Skill),
-        "commands" => Some(ClaudeFileKind::Command),
-        "hooks" => Some(ClaudeFileKind::Hook),
-        "settings.json" | "settings.local.json" => Some(ClaudeFileKind::Settings),
-        _ => None,
+    // Installed layout: find `.claude` anywhere in the path.
+    if let Some(claude_pos) = comps.iter().position(|c| c.as_os_str() == ".claude") {
+        return match comps.get(claude_pos + 1)?.as_os_str().to_str()? {
+            "agents" => Some(ClaudeFileKind::Agent),
+            "skills" => Some(ClaudeFileKind::Skill),
+            "commands" => Some(ClaudeFileKind::Command),
+            "hooks" => Some(ClaudeFileKind::Hook),
+            "settings.json" | "settings.local.json" => Some(ClaudeFileKind::Settings),
+            _ => None,
+        };
     }
+
+    // Plugin-repo layout: bare kind dir somewhere in the path, but NOT preceded
+    // by another known Claude dir (to avoid false positives on e.g. a `.claude`
+    // subtree that was already handled above).
+    for (i, comp) in comps.iter().enumerate() {
+        // Must not be preceded by `.claude` (handled above) or another kind dir.
+        if i > 0 && comps[i - 1].as_os_str() == ".claude" {
+            continue;
+        }
+        match comp.as_os_str().to_str()? {
+            "agents" => return Some(ClaudeFileKind::Agent),
+            "skills" => return Some(ClaudeFileKind::Skill),
+            "commands" => return Some(ClaudeFileKind::Command),
+            "hooks" => return Some(ClaudeFileKind::Hook),
+            _ => {}
+        }
+    }
+    None
 }
 
 pub mod agents;
@@ -59,12 +78,18 @@ pub struct ClaudeValidator;
 impl Validator for ClaudeValidator {
     fn patterns(&self) -> &[&str] {
         &[
+            // Installed layout (.claude/ prefix)
             ".claude/agents/**/*.md",
             ".claude/skills/**/*.md",
             ".claude/commands/**/*.md",
             ".claude/hooks/*",
             ".claude/settings.json",
             ".claude/settings.local.json",
+            // Plugin-repo layout (bare root dirs)
+            "agents/**/*.md",
+            "skills/**/*.md",
+            "commands/**/*.md",
+            "hooks/*",
         ]
     }
 

@@ -140,9 +140,22 @@ impl FrontmatterValidator {
 
         let fields = match parse(src) {
             Ok(f) => f,
-            // Files without a frontmatter fence are not agent config files
-            // and are silently skipped rather than flagged as errors.
-            Err(ParseError::NoFence) => return vec![],
+            Err(ParseError::NoFence) => {
+                // When `only_file` is set, non-matching files were already
+                // filtered above. When it is NOT set, every file reaching this
+                // point is expected to carry frontmatter (e.g. agents/, commands/).
+                // Files that genuinely have no frontmatter in that context are errors.
+                // Supporting files under skills/ use `only_file` and are skipped earlier.
+                if self.only_file.is_none() {
+                    return vec![Diagnostic::error(
+                        path,
+                        1,
+                        1,
+                        "missing frontmatter: file must start with '---'",
+                    )];
+                }
+                return vec![];
+            }
             Err(ParseError::UnclosedFence) => {
                 return vec![Diagnostic::error(
                     path,
@@ -399,12 +412,26 @@ mod tests {
     }
 
     #[test]
-    fn no_fence_returns_empty() {
+    fn no_fence_without_only_file_is_error() {
         let v = FrontmatterValidator::builder()
             .required(FieldRule::new("name"))
             .build();
         let src = "name: foo\n";
         let diags = v.validate(Path::new("agent.md"), src);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("missing frontmatter"));
+    }
+
+    #[test]
+    fn no_fence_with_only_file_non_matching_is_empty() {
+        // Supporting files (no only_file match) are silently skipped.
+        let v = FrontmatterValidator::builder()
+            .only_file("SKILL.md")
+            .required(FieldRule::new("name"))
+            .build();
+        let src = "name: foo\n";
+        // File name is "guide.md", not "SKILL.md" — already filtered before NoFence check.
+        let diags = v.validate(Path::new("skills/my-skill/references/guide.md"), src);
         assert!(diags.is_empty());
     }
 

@@ -135,13 +135,15 @@ pub fn run_on(
 }
 
 /// Infrastructure convenience: walk `roots`, read each file, then delegate to
-/// [`run_on`]. Read errors are surfaced as [`Diagnostic::error`] entries rather
-/// than panicking.
+/// [`run_on`]. Only files claimed by at least one validator are read; binary
+/// and unrecognised files are silently skipped. Read errors on claimed files
+/// are surfaced as [`Diagnostic::error`] entries rather than panicking.
 pub fn run(roots: &[PathBuf], validators: &[Box<dyn Validator>]) -> RunResult {
     let mut read_errors: Vec<Diagnostic> = Vec::new();
 
     let files: Vec<(PathBuf, String)> = collect_paths(roots)
         .into_iter()
+        .filter(|path| !find_validators(path, validators).is_empty())
         .filter_map(|path| match std::fs::read_to_string(&path) {
             Ok(src) => Some((path, src)),
             Err(e) => {
@@ -163,6 +165,9 @@ pub fn run(roots: &[PathBuf], validators: &[Box<dyn Validator>]) -> RunResult {
     result
 }
 
+/// Directory names that are never walked (build artifacts, VCS, package caches).
+const SKIP_DIRS: &[&str] = &["target", ".git", "node_modules", "plugins"];
+
 fn collect_paths(roots: &[PathBuf]) -> Vec<PathBuf> {
     let mut out = Vec::new();
     for root in roots {
@@ -172,6 +177,14 @@ fn collect_paths(roots: &[PathBuf]) -> Vec<PathBuf> {
             for entry in walkdir::WalkDir::new(root)
                 .follow_links(false)
                 .into_iter()
+                .filter_entry(|e| {
+                    if e.file_type().is_dir() {
+                        let name = e.file_name().to_string_lossy();
+                        !SKIP_DIRS.iter().any(|skip| *skip == name.as_ref())
+                    } else {
+                        true
+                    }
+                })
                 .filter_map(|e| e.ok())
                 .filter(|e| e.file_type().is_file())
             {
@@ -186,10 +199,27 @@ fn find_validators<'a>(
     path: &Path,
     validators: &'a [Box<dyn Validator>],
 ) -> Vec<&'a dyn Validator> {
-    let path_str = path.to_string_lossy();
+    // Build candidate strings: every component-suffix of the path, so that
+    // patterns like `.claude/agents/**/*.md` match both relative paths
+    // (`.claude/agents/foo.md`) and absolute paths (`/repo/.claude/agents/foo.md`).
+    let comps: Vec<_> = path.components().collect();
+    let suffixes: Vec<String> = (0..comps.len())
+        .map(|i| {
+            comps[i..]
+                .iter()
+                .collect::<PathBuf>()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+
     validators
         .iter()
-        .filter(|v| v.patterns().iter().any(|p| glob_match(p, &path_str)))
+        .filter(|v| {
+            v.patterns()
+                .iter()
+                .any(|p| suffixes.iter().any(|s| glob_match(p, s)))
+        })
         .map(|v| v.as_ref())
         .collect()
 }

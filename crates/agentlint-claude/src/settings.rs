@@ -12,7 +12,56 @@ const KNOWN_KEYS: &[&str] = &[
     "apiKeyHelper",
     "includeCoAuthoredBy",
     "enabledMcpjsonServers",
+    // Additional Claude Code settings keys
+    "cleanupPeriodDays",
+    "effortLevel",
+    "enabledPlugins",
+    "extraKnownMarketplaces",
+    "fastMode",
+    "skipDangerousModePermissionPrompt",
+    "statusLine",
+    "verbose",
 ];
+
+/// Warn when a single matcher has more hooks than this. Each hook spawns a
+/// subprocess; too many causes process accumulation in long sessions.
+const MAX_HOOKS_PER_MATCHER: usize = 7;
+
+/// Hook command substrings that produce a warning diagnostic.
+/// Matched against the full command string regardless of absolute prefix.
+const WARN_PATTERNS: &[(&str, &str)] = &[
+    (
+        "cargo",
+        "invokes the Rust compiler on every hook call; consolidate or use a git hook instead",
+    ),
+    (
+        "clippy",
+        "runs clippy on every hook call; redundant with cargo-check and expensive",
+    ),
+    (
+        "python3",
+        "spawns a Python interpreter on every hook call; prefer a compiled binary",
+    ),
+    (
+        "python",
+        "spawns a Python interpreter on every hook call; prefer a compiled binary",
+    ),
+    (
+        "node",
+        "spawns a Node.js runtime on every hook call; prefer a compiled binary",
+    ),
+    (
+        "ruby",
+        "spawns a Ruby interpreter on every hook call; prefer a compiled binary",
+    ),
+];
+
+/// Hook command substrings that produce an error diagnostic.
+/// These patterns are always wrong in an agent hook context.
+const ERROR_PATTERNS: &[(&str, &str)] = &[(
+    "sleep",
+    "sleep in a hook blocks the agent; remove the sleep or run the hook async",
+)];
 
 impl SettingsValidator {
     pub fn validate(path: &Path, src: &str) -> Vec<Diagnostic> {
@@ -65,18 +114,86 @@ impl SettingsValidator {
             }
         }
 
-        // hooks.<event> must be an array of objects each with a "command" string.
+        // hooks.<event> is an array of matcher groups: [{matcher, hooks: [{type, command}]}]
         if let Some(hooks) = obj.get("hooks").and_then(|v| v.as_object()) {
             for (event, entries) in hooks {
-                if let Some(arr) = entries.as_array() {
-                    for (i, entry) in arr.iter().enumerate() {
-                        if entry.get("command").and_then(|v| v.as_str()).is_none() {
+                let Some(groups) = entries.as_array() else {
+                    continue;
+                };
+                for (gi, group) in groups.iter().enumerate() {
+                    let matcher = group
+                        .get("matcher")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("<no matcher>");
+
+                    let inner = match group.get("hooks").and_then(|v| v.as_array()) {
+                        Some(h) => h,
+                        None => {
                             diags.push(Diagnostic::error(
                                 path,
                                 1,
                                 1,
-                                format!("hooks.{event}[{i}] must have a 'command' string field"),
+                                format!(
+                                    "hooks.{event}[{gi}] (matcher: {matcher:?}) \
+                                     must have a 'hooks' array"
+                                ),
                             ));
+                            continue;
+                        }
+                    };
+
+                    // Structural check: each inner hook needs a command.
+                    for (hi, hook) in inner.iter().enumerate() {
+                        if hook.get("command").and_then(|v| v.as_str()).is_none() {
+                            diags.push(Diagnostic::error(
+                                path,
+                                1,
+                                1,
+                                format!(
+                                    "hooks.{event}[{gi}].hooks[{hi}] \
+                                     must have a 'command' string field"
+                                ),
+                            ));
+                        }
+                    }
+
+                    // Warn when a matcher has too many hooks (process spawn pressure).
+                    if inner.len() > MAX_HOOKS_PER_MATCHER {
+                        diags.push(Diagnostic::warning(
+                            path,
+                            1,
+                            1,
+                            format!(
+                                "hooks.{event} matcher {matcher:?} has {} hooks \
+                                 (>{MAX_HOOKS_PER_MATCHER}); each spawns a subprocess — \
+                                 consider consolidating into a single binary",
+                                inner.len()
+                            ),
+                        ));
+                    }
+
+                    // Check hook commands against warn/error pattern tables.
+                    for hook in inner {
+                        let cmd = hook.get("command").and_then(|v| v.as_str()).unwrap_or("");
+                        for (pattern, reason) in WARN_PATTERNS {
+                            if cmd.contains(pattern) {
+                                diags.push(Diagnostic::warning(
+                                    path,
+                                    1,
+                                    1,
+                                    format!("hooks.{event} command contains '{pattern}': {reason}"),
+                                ));
+                            }
+                        }
+                        for (pattern, reason) in ERROR_PATTERNS {
+                            if cmd.contains(pattern) {
+                                diags.push(Diagnostic::error(
+                                    path,
+                                    1,
+                                    1,
+                                    format!("hooks.{event} command contains '{pattern}': {reason}"),
+                                ));
+                            }
                         }
                     }
                 }
@@ -148,7 +265,8 @@ mod tests {
 
     #[test]
     fn hooks_entry_missing_command_is_error() {
-        let src = r#"{"hooks": {"PreToolUse": [{"matcher": "Bash"}]}}"#;
+        let src =
+            r#"{"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command"}]}]}}"#;
         assert_error_contains(
             &SettingsValidator::validate(Path::new(PATH), src),
             "'command' string field",
@@ -157,9 +275,73 @@ mod tests {
 
     #[test]
     fn hooks_entry_with_command_is_clean() {
-        let src =
-            r#"{"hooks": {"PreToolUse": [{"matcher": "Bash", "command": "/usr/bin/script"}]}}"#;
+        let src = r#"{"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "/usr/bin/script"}]}]}}"#;
         assert_clean(&SettingsValidator::validate(Path::new(PATH), src));
+    }
+
+    #[test]
+    fn hooks_too_many_per_matcher_is_warning() {
+        // 8 hooks on one matcher should warn
+        let hook = r#"{"type":"command","command":"/usr/bin/x"}"#;
+        let hooks_arr = std::iter::repeat(hook)
+            .take(8)
+            .collect::<Vec<_>>()
+            .join(",");
+        let src =
+            format!(r#"{{"hooks":{{"PreToolUse":[{{"matcher":"Bash","hooks":[{hooks_arr}]}}]}}}}"#);
+        let diags = SettingsValidator::validate(Path::new(PATH), &src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.message.contains("spawns a subprocess")),
+            "expected process-spawn warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn hook_with_python3_is_warning() {
+        let src = r#"{"hooks":{"PostToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"/usr/bin/python3 /home/user/.claude/hooks/redact.py"}]}]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags.iter().any(|d| d.message.contains("python3")
+                && d.severity == agentlint_core::Severity::Warning),
+            "expected python3 warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn hook_with_sleep_is_error() {
+        let src = r#"{"hooks":{"PostToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"/bin/sleep 10"}]}]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.message.contains("sleep")
+                    && d.severity == agentlint_core::Severity::Error),
+            "expected sleep error, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn hook_with_cargo_is_warning() {
+        let src = r#"{"hooks":{"PreToolUse":[{"matcher":"Edit","hooks":[{"type":"command","command":"/home/user/.cargo/bin/cargo clippy"}]}]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.message.contains("cargo")
+                    && d.severity == agentlint_core::Severity::Warning),
+            "expected cargo warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn hooks_missing_hooks_array_is_error() {
+        let src = r#"{"hooks": {"PreToolUse": [{"matcher": "Bash"}]}}"#;
+        assert_error_contains(
+            &SettingsValidator::validate(Path::new(PATH), src),
+            "must have a 'hooks' array",
+        );
     }
 
     #[test]
