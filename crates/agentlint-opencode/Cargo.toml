@@ -10,4 +10,4 @@ description = "agentlint validator for OpenCode AGENTS.md and opencode.json file
 
 [dependencies]
 agentlint-core = { workspace = true }
-serde_json     = "1"
+serde_json     = { workspace = true }

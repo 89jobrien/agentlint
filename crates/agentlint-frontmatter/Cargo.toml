@@ -1,6 +1,6 @@
 [package]
 name = "agentlint-frontmatter"
-version = "0.2.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -10,7 +10,7 @@ description = "YAML frontmatter parser for agentlint — shared by Claude Code a
 
 [dependencies]
 agentlint-core = { workspace = true }
-nom             = "7"
+nom             = { workspace = true }
 
 [dev-dependencies]
-proptest       = "1"
+proptest       = { workspace = true }

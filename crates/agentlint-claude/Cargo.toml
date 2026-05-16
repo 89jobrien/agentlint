@@ -1,6 +1,6 @@
 [package]
 name = "agentlint-claude"
-version = "0.2.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -11,8 +11,8 @@ description = "agentlint validator for Claude Code agent harness files (agents, 
 [dependencies]
 agentlint-core        = { workspace = true }
 agentlint-frontmatter = { workspace = true }
-serde_json            = "1"
+serde_json            = { workspace = true }
 
 [dev-dependencies]
 agentlint-core = { workspace = true, features = ["test-utils"] }
-tempfile       = "3"
+tempfile       = { workspace = true }
