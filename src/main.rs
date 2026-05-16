@@ -9,7 +9,11 @@ use std::process;
 use std::str::FromStr;
 
 #[derive(Parser)]
-#[command(name = "agentlint", about = "Lint AI coding agent harness files")]
+#[command(
+    name = "agentlint",
+    about = "Lint AI coding agent harness files",
+    version
+)]
 struct Cli {
     /// Files or directories to validate (defaults to current directory)
     paths: Vec<PathBuf>,
