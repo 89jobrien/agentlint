@@ -14,7 +14,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2024"
-version = "0.4.1"
+version = "0.5.0"
 license = "MIT OR Apache-2.0"
 authors = ["Joseph O'Brien"]
 repository = "https://github.com/89jobrien/agentlint"
@@ -22,14 +22,14 @@ publish = true
 
 [workspace.dependencies]
 # Internal crates
-agentlint-core        = { path = "crates/agentlint-core",        version = "0.4.1" }
-agentlint-frontmatter = { path = "crates/agentlint-frontmatter", version = "0.4.1" }
-agentlint-claude      = { path = "crates/agentlint-claude",      version = "0.4.1" }
-agentlint-cursor      = { path = "crates/agentlint-cursor",      version = "0.4.1" }
-agentlint-codex       = { path = "crates/agentlint-codex",       version = "0.4.1" }
-agentlint-opencode    = { path = "crates/agentlint-opencode",    version = "0.4.1" }
-agentlint-gemini      = { path = "crates/agentlint-gemini",      version = "0.4.1" }
-agentlint-pi          = { path = "crates/agentlint-pi",          version = "0.4.1" }
+agentlint-core        = { path = "crates/agentlint-core",        version = "0.5.0" }
+agentlint-frontmatter = { path = "crates/agentlint-frontmatter", version = "0.5.0" }
+agentlint-claude      = { path = "crates/agentlint-claude",      version = "0.5.0" }
+agentlint-cursor      = { path = "crates/agentlint-cursor",      version = "0.5.0" }
+agentlint-codex       = { path = "crates/agentlint-codex",       version = "0.5.0" }
+agentlint-opencode    = { path = "crates/agentlint-opencode",    version = "0.5.0" }
+agentlint-gemini      = { path = "crates/agentlint-gemini",      version = "0.5.0" }
+agentlint-pi          = { path = "crates/agentlint-pi",          version = "0.5.0" }
 # External shared deps
 clap       = { version = "4",   features = ["derive"] }
 nom        = "7"
