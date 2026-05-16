@@ -37,12 +37,15 @@ mod config_types {
 /// Controls which rules fire. Rules at or below the configured difficulty are
 /// reported; rules above are silently suppressed.
 ///
-/// Ordered: `Easy` < `Hard` < `Painful`.
+/// Ordered: `Easy` < `Normal` < `Hard` < `Painful`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum Difficulty {
     /// Definite breakage only: invalid JSON, missing shebang, empty files,
     /// credential exposure.
     Easy,
+    /// Common anti-patterns with clear fixes: naive string matching on raw
+    /// stdin, missing JSON parsing in hooks.
+    Normal,
     /// Breakage + operational problems: hook leaks, dangerous settings,
     /// missing required fields.
     #[default]
@@ -56,6 +59,7 @@ impl std::fmt::Display for Difficulty {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Difficulty::Easy => write!(f, "easy"),
+            Difficulty::Normal => write!(f, "normal"),
             Difficulty::Hard => write!(f, "hard"),
             Difficulty::Painful => write!(f, "painful"),
         }
@@ -67,10 +71,11 @@ impl std::str::FromStr for Difficulty {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "easy" => Ok(Difficulty::Easy),
+            "normal" => Ok(Difficulty::Normal),
             "hard" => Ok(Difficulty::Hard),
             "painful" => Ok(Difficulty::Painful),
             other => Err(format!(
-                "unknown difficulty '{other}'; expected easy, hard, or painful"
+                "unknown difficulty '{other}'; expected easy, normal, hard, or painful"
             )),
         }
     }

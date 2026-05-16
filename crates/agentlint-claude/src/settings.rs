@@ -1,3 +1,4 @@
+use crate::mcp::validate_server_entry;
 use agentlint_core::{Diagnostic, Difficulty};
 use std::path::Path;
 
@@ -254,6 +255,24 @@ impl SettingsValidator {
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // mcpServers entries — validate each server using the shared MCP helper.
+        if let Some(servers) = obj.get("mcpServers").and_then(|v| v.as_object()) {
+            for (name, entry) in servers {
+                match entry.as_object() {
+                    Some(server) => validate_server_entry(path, name, server, &mut diags),
+                    None => diags.push(
+                        Diagnostic::error(
+                            path,
+                            1,
+                            1,
+                            format!("mcpServers.{name}: server entry must be a JSON object"),
+                        )
+                        .with_rule("claude/mcp/invalid-server-entry", Difficulty::Easy),
+                    ),
                 }
             }
         }
@@ -585,6 +604,30 @@ mod tests {
             &SettingsValidator::validate(Path::new(PATH), src),
             "must have a 'hooks' array",
         );
+    }
+
+    #[test]
+    fn mcp_servers_in_settings_op_uri_warns() {
+        let src = r#"{
+            "mcpServers": {
+                "my-server": {
+                    "command": "npx",
+                    "env": {"KEY": "op://Personal/item/field"}
+                }
+            }
+        }"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags.iter().any(|d| d.message.contains("op://")),
+            "expected op:// warning in settings mcpServers, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn mcp_servers_in_settings_missing_transport_is_error() {
+        let src = r#"{"mcpServers": {"s": {"args": ["foo"]}}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert_error_contains(&diags, "transport");
     }
 
     #[test]
