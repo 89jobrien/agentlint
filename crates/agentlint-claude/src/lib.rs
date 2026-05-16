@@ -14,6 +14,7 @@ enum ClaudeFileKind {
     Hook,
     Settings,
     Mcp,
+    Meta,
 }
 
 /// Classify a path into its Claude harness file kind by walking components.
@@ -53,6 +54,11 @@ fn claude_file_kind(path: &Path) -> Option<ClaudeFileKind> {
         return Some(ClaudeFileKind::Mcp);
     }
 
+    // CLAUDE.md anywhere in the tree.
+    if comps.last().is_some_and(|c| c.as_os_str() == "CLAUDE.md") {
+        return Some(ClaudeFileKind::Meta);
+    }
+
     None
 }
 
@@ -60,6 +66,7 @@ pub mod agents;
 pub mod commands;
 pub mod hooks;
 pub mod mcp;
+pub mod meta;
 pub mod settings;
 pub mod skills;
 
@@ -76,6 +83,8 @@ impl Validator for ClaudeValidator {
             ".claude/settings.json",
             ".claude/settings.local.json",
             ".mcp.json",
+            "CLAUDE.md",
+            "**/CLAUDE.md",
         ]
     }
 
@@ -87,6 +96,7 @@ impl Validator for ClaudeValidator {
             Some(ClaudeFileKind::Hook) => hooks::HooksValidator::validate(path, src),
             Some(ClaudeFileKind::Settings) => settings::SettingsValidator::validate(path, src),
             Some(ClaudeFileKind::Mcp) => mcp::McpValidator::validate(path, src),
+            Some(ClaudeFileKind::Meta) => meta::MetaValidator::validate(path, src),
             None => vec![],
         }
     }
