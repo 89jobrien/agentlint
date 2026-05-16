@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "agentlint"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "agentlint-claude",
  "agentlint-codex",
@@ -18,7 +18,7 @@ dependencies = [
 
 [[package]]
 name = "agentlint-claude"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "agentlint-core",
  "agentlint-frontmatter",
@@ -28,14 +28,14 @@ dependencies = [
 
 [[package]]
 name = "agentlint-codex"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "agentlint-core",
 ]
 
 [[package]]
 name = "agentlint-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -46,7 +46,7 @@ dependencies = [
 
 [[package]]
 name = "agentlint-cursor"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "agentlint-core",
  "agentlint-frontmatter",
@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "agentlint-frontmatter"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "agentlint-core",
  "nom",
@@ -63,14 +63,14 @@ dependencies = [
 
 [[package]]
 name = "agentlint-gemini"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "agentlint-core",
 ]
 
 [[package]]
 name = "agentlint-opencode"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "agentlint-core",
  "serde_json",
@@ -78,7 +78,7 @@ dependencies = [
 
 [[package]]
 name = "agentlint-pi"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "agentlint-core",
 ]
