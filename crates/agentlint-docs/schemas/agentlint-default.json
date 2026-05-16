@@ -1,0 +1,27 @@
+{
+  "file_glob": "docs/**/*.md",
+  "required_fields": ["title", "doctype", "project", "status", "created", "updated"],
+  "doctypes": [
+    "idea", "spec", "plan", "adr", "roadmap", "guide", "reference",
+    "runbook", "architecture", "capability-matrix", "testing", "development", "readme"
+  ],
+  "statuses": ["draft", "active", "archived", "superseded"],
+  "date_fields": ["created", "updated"],
+  "conventions": [
+    {
+      "format": "{ref}-{topic}.{doctype}.md",
+      "dirs": ["ideas", "specs", "plans"],
+      "comment": "Research doc with explicit doctype suffix — tried first for scoped dirs."
+    },
+    {
+      "format": "{ref}-{topic}.md",
+      "dirs": ["ideas", "specs", "plans"],
+      "comment": "Research doc without doctype suffix — doctype inferred from parent dir name."
+    },
+    {
+      "format": "{doctype}.{project}.md",
+      "dirs": [],
+      "comment": "Catch-all repo doc convention — applies to any directory."
+    }
+  ]
+}

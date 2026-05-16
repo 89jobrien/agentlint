@@ -1,9 +1,9 @@
 use agentlint_core::{Diagnostic, Difficulty, Validator};
 use agentlint_frontmatter::{ParseError, parse};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-const DEFAULT_CONVENTIONS_JSON: &str = include_str!("../schemas/conventions.default.json");
+const AGENTLINT_DEFAULT_JSON: &str = include_str!("../schemas/agentlint-default.json");
 
 // ---------------------------------------------------------------------------
 // FilenameConvention — configurable naming format
@@ -36,7 +36,7 @@ const DEFAULT_CONVENTIONS_JSON: &str = include_str!("../schemas/conventions.defa
 /// dirs   = ["specs", "plans", "ideas"]
 /// format = "{ref}-{topic}.{doctype}.md"
 /// ```
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct FilenameConvention {
     /// Format template, e.g. `"{doctype}.{project}.md"`.
     pub format: String,
@@ -160,7 +160,7 @@ fn match_template_inner(
 /// dirs   = ["specs", "plans", "ideas"]
 /// format = "{ref}-{topic}.{doctype}.md"
 /// ```
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct DocsSchema {
     /// Glob pattern that selects which files this validator claims.
@@ -180,40 +180,26 @@ pub struct DocsSchema {
 
 impl Default for DocsSchema {
     fn default() -> Self {
+        // Use a shadow struct without #[serde(default)] to avoid infinite
+        // recursion: DocsSchema::default() → deserialize → default() → …
+        #[derive(Deserialize)]
+        struct Raw {
+            file_glob: String,
+            required_fields: Vec<String>,
+            doctypes: Vec<String>,
+            statuses: Vec<String>,
+            date_fields: Vec<String>,
+            conventions: Vec<FilenameConvention>,
+        }
+        let raw: Raw = serde_json::from_str(AGENTLINT_DEFAULT_JSON)
+            .expect("bundled agentlint-default.json is valid");
         Self {
-            file_glob: "docs/**/*.md".into(),
-            required_fields: vec![
-                "title".into(),
-                "doctype".into(),
-                "project".into(),
-                "status".into(),
-                "created".into(),
-                "updated".into(),
-            ],
-            doctypes: vec![
-                "idea".into(),
-                "spec".into(),
-                "plan".into(),
-                "adr".into(),
-                "roadmap".into(),
-                "guide".into(),
-                "reference".into(),
-                "runbook".into(),
-                "architecture".into(),
-                "capability-matrix".into(),
-                "testing".into(),
-                "development".into(),
-                "readme".into(),
-            ],
-            statuses: vec![
-                "draft".into(),
-                "active".into(),
-                "archived".into(),
-                "superseded".into(),
-            ],
-            date_fields: vec!["created".into(), "updated".into()],
-            conventions: serde_json::from_str(DEFAULT_CONVENTIONS_JSON)
-                .expect("bundled conventions.default.json is valid"),
+            file_glob: raw.file_glob,
+            required_fields: raw.required_fields,
+            doctypes: raw.doctypes,
+            statuses: raw.statuses,
+            date_fields: raw.date_fields,
+            conventions: raw.conventions,
         }
     }
 }
@@ -648,6 +634,18 @@ mod tests {
 
     fn v() -> DocsValidator {
         DocsValidator::default()
+    }
+
+    // --- serialization round-trip ---
+
+    #[test]
+    fn docs_schema_serializes_to_json() {
+        let schema = DocsSchema::default();
+        let json = serde_json::to_string(&schema).expect("serialize");
+        let back: DocsSchema = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back.doctypes, schema.doctypes);
+        assert_eq!(back.statuses, schema.statuses);
+        assert_eq!(back.required_fields, schema.required_fields);
     }
 
     // --- fence skip ---
