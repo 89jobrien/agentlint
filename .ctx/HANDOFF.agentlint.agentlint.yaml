@@ -1,8 +1,21 @@
 project: agentlint
 id: agentlint
-updated: 20260516.001948
+updated: 20260516.003108
 items: []
 log:
+  - date: 20260516.003108
+    session: 5
+    summary: >-
+      shipped v0.4.1: sentinel review pass — applied 4 suggestions and fixed 2 blocking
+      issues (cursorrules never-fires gate, Bash(**) detection, alwaysApply
+      case-insensitive, run word-boundary, message clarity, interaction test); 228 tests
+    commits:
+      - sha: a567bf8
+        branch: main
+      - sha: af146e9
+        branch: main
+      - sha: 393cb68
+        branch: main
   - date: 20260516.001948
     session: 4
     summary: >-
