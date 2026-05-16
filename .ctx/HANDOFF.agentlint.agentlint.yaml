@@ -1,8 +1,18 @@
 project: agentlint
 id: agentlint
-updated: 20260516.003108
+updated: 20260516.004845
 items: []
 log:
+  - date: 20260516.004845
+    session: 6
+    summary: >-
+      shipped v0.5.0: gemini/pi/opencode structural coverage — no-heading, too-sparse,
+      no-commands-section (#51 #52 #53); 257 tests passing
+    commits:
+      - sha: 21e1698
+        branch: main
+      - sha: b22d088
+        branch: main
   - date: 20260516.003108
     session: 5
     summary: >-
@@ -30,8 +40,6 @@ log:
       - sha: b1ff07d
         branch: main
       - sha: 12ace45
-        branch: main
-      - sha: f0001af
         branch: main
   - date: 20260516.213000
     session: 3
