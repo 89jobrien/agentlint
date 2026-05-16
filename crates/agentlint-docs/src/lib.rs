@@ -3,9 +3,11 @@ use agentlint_frontmatter::{ParseError, parse};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+pub mod infer;
 pub mod plugin;
 pub mod registry;
 
+pub use infer::infer_schema;
 pub use registry::SchemaRegistry;
 
 use plugin::BUILTIN_SRC;
@@ -327,21 +329,8 @@ fn extract_ref_prefix(s: &str) -> &str {
 // Date validation
 // ---------------------------------------------------------------------------
 
-/// Returns true if `s` matches `YYYY-MM-DD` with plausible calendar ranges.
 fn is_valid_date(s: &str) -> bool {
-    let parts: Vec<&str> = s.split('-').collect();
-    if parts.len() != 3 {
-        return false;
-    }
-    let (y, m, d) = (parts[0], parts[1], parts[2]);
-    if y.len() != 4 || m.len() != 2 || d.len() != 2 {
-        return false;
-    }
-    let (Ok(year), Ok(month), Ok(day)) = (y.parse::<u32>(), m.parse::<u32>(), d.parse::<u32>())
-    else {
-        return false;
-    };
-    year >= 2000 && (1..=12).contains(&month) && (1..=31).contains(&day)
+    infer::is_valid_date(s)
 }
 
 // ---------------------------------------------------------------------------
