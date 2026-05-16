@@ -47,22 +47,6 @@ fn claude_file_kind(path: &Path) -> Option<ClaudeFileKind> {
         };
     }
 
-    // Plugin-repo layout: bare kind dir somewhere in the path, but NOT preceded
-    // by another known Claude dir (to avoid false positives on e.g. a `.claude`
-    // subtree that was already handled above).
-    for (i, comp) in comps.iter().enumerate() {
-        // Must not be preceded by `.claude` (handled above) or another kind dir.
-        if i > 0 && comps[i - 1].as_os_str() == ".claude" {
-            continue;
-        }
-        match comp.as_os_str().to_str()? {
-            "agents" => return Some(ClaudeFileKind::Agent),
-            "skills" => return Some(ClaudeFileKind::Skill),
-            "commands" => return Some(ClaudeFileKind::Command),
-            "hooks" => return Some(ClaudeFileKind::Hook),
-            _ => {}
-        }
-    }
     None
 }
 
@@ -78,18 +62,12 @@ pub struct ClaudeValidator;
 impl Validator for ClaudeValidator {
     fn patterns(&self) -> &[&str] {
         &[
-            // Installed layout (.claude/ prefix)
             ".claude/agents/**/*.md",
             ".claude/skills/**/*.md",
             ".claude/commands/**/*.md",
             ".claude/hooks/*",
             ".claude/settings.json",
             ".claude/settings.local.json",
-            // Plugin-repo layout (bare root dirs)
-            "agents/**/*.md",
-            "skills/**/*.md",
-            "commands/**/*.md",
-            "hooks/*",
         ]
     }
 

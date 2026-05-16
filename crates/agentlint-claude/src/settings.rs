@@ -21,6 +21,7 @@ const KNOWN_KEYS: &[&str] = &[
     "skipDangerousModePermissionPrompt",
     "statusLine",
     "verbose",
+    "attribution",
 ];
 
 /// Warn when a single matcher has more hooks than this. Each hook spawns a

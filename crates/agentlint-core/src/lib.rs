@@ -334,7 +334,7 @@ pub fn run(roots: &[PathBuf], validators: &[Box<dyn Validator>], config: &RunCon
 }
 
 /// Directory names that are never walked (build artifacts, VCS, package caches).
-const SKIP_DIRS: &[&str] = &["target", ".git", "node_modules", "plugins"];
+const SKIP_DIRS: &[&str] = &["target", ".git", "node_modules", "plugins", ".maestro"];
 
 fn collect_paths(roots: &[PathBuf]) -> Vec<PathBuf> {
     let mut out = Vec::new();
