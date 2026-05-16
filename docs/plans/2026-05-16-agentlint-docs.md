@@ -47,20 +47,21 @@ meta: # optional — opaque; presence valid, no internal validation
 
 ### `doctype` enum
 
-| Value               | Description                                               |
-| ------------------- | --------------------------------------------------------- |
-| `roadmap`           | Project roadmap — shipped milestones and planned work     |
-| `plan`              | Design or implementation plan for a specific feature      |
-| `adr`               | Architecture Decision Record                              |
-| `spec`              | Detailed specification for a component or protocol        |
-| `guide`             | How-to or tutorial document                               |
-| `reference`         | Reference material (API, CLI flags, config keys)          |
-| `runbook`           | Operational runbook — incident response, deployment steps |
-| `architecture`      | System architecture overview                              |
-| `capability-matrix` | Feature/platform capability comparison                    |
-| `testing`           | Testing strategy or test plan                             |
-| `development`       | Development setup, conventions, contributing guide        |
-| `readme`            | Project-level README equivalent in docs form              |
+| Value               | Description                                                          |
+| ------------------- | -------------------------------------------------------------------- |
+| `idea`              | Brainstorm capture — options explored, trade-offs, open questions    |
+| `spec`              | Formal design document — goal, architecture, decisions, out of scope |
+| `plan`              | Implementation plan — task graph, sequencing, crate assignments      |
+| `adr`               | Architecture Decision Record                                         |
+| `roadmap`           | Project roadmap — shipped milestones and planned work                |
+| `guide`             | How-to or tutorial document                                          |
+| `reference`         | Reference material (API, CLI flags, config keys)                     |
+| `runbook`           | Operational runbook — incident response, deployment steps            |
+| `architecture`      | System architecture overview                                         |
+| `capability-matrix` | Feature/platform capability comparison                               |
+| `testing`           | Testing strategy or test plan                                        |
+| `development`       | Development setup, conventions, contributing guide                   |
+| `readme`            | Project-level README equivalent in docs form                         |
 
 ### `status` enum
 
