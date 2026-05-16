@@ -1,4 +1,4 @@
-use agentlint_core::{Diagnostic, Validator};
+use agentlint_core::{Diagnostic, Difficulty, Validator};
 use std::path::Path;
 
 pub struct CodexValidator;
@@ -10,7 +10,10 @@ impl Validator for CodexValidator {
 
     fn validate(&self, path: &Path, src: &str) -> Vec<Diagnostic> {
         if src.trim().is_empty() {
-            vec![Diagnostic::error(path, 1, 1, "AGENTS.md is empty")]
+            vec![
+                Diagnostic::error(path, 1, 1, "AGENTS.md is empty")
+                    .with_rule("codex/content/empty", Difficulty::Easy),
+            ]
         } else {
             vec![]
         }

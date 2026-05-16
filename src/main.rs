@@ -1,7 +1,10 @@
-use agentlint_core::{OutputFormat, Validator, format_gnu, format_json, run};
+use agentlint_core::{
+    Difficulty, OutputFormat, RunConfig, Validator, format_gnu, format_json, run,
+};
 use clap::Parser;
 use std::path::PathBuf;
 use std::process;
+use std::str::FromStr;
 
 #[derive(Parser)]
 #[command(name = "agentlint", about = "Lint AI coding agent harness files")]
@@ -13,9 +16,27 @@ struct Cli {
     #[arg(long, value_name = "FORMAT", default_value = "gnu")]
     format: String,
 
+    /// Difficulty level: easy | hard | painful (overrides .agentlint.toml)
+    #[arg(long, value_name = "LEVEL")]
+    difficulty: Option<String>,
+
     /// Always exit 0 (audit mode)
     #[arg(long)]
     exit_zero: bool,
+}
+
+fn load_toml_difficulty() -> Option<Difficulty> {
+    let src = std::fs::read_to_string(".agentlint.toml").ok()?;
+    // Minimal TOML parse: look for `difficulty = "..."` under [agentlint].
+    for line in src.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("difficulty") {
+            let rest = rest.trim_start_matches([' ', '=']).trim();
+            let val = rest.trim_matches('"');
+            return Difficulty::from_str(val).ok();
+        }
+    }
+    None
 }
 
 fn main() {
@@ -25,6 +46,22 @@ fn main() {
         "json" => OutputFormat::Json,
         _ => OutputFormat::Gnu,
     };
+
+    // CLI flag wins; fall back to .agentlint.toml; then default (Hard).
+    let difficulty = cli
+        .difficulty
+        .as_deref()
+        .map(|s| match Difficulty::from_str(s) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("agentlint: {e}");
+                process::exit(2);
+            }
+        })
+        .or_else(load_toml_difficulty)
+        .unwrap_or(Difficulty::Hard);
+
+    let config = RunConfig { difficulty };
 
     let roots: Vec<PathBuf> = if cli.paths.is_empty() {
         vec![PathBuf::from(".")]
@@ -42,7 +79,7 @@ fn main() {
         Box::new(agentlint_pi::PiValidator),
     ];
 
-    let result = run(&roots, &validators);
+    let result = run(&roots, &validators, &config);
     let has_errors = result
         .diagnostics
         .iter()

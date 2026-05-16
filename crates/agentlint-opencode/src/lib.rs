@@ -1,4 +1,4 @@
-use agentlint_core::{Diagnostic, Validator};
+use agentlint_core::{Diagnostic, Difficulty, Validator};
 use std::path::Path;
 
 /// Validates that OpenCode's `AGENTS.md` is non-empty.
@@ -11,7 +11,10 @@ impl Validator for AgentsMarkdownValidator {
 
     fn validate(&self, path: &Path, src: &str) -> Vec<Diagnostic> {
         if src.trim().is_empty() {
-            return vec![Diagnostic::error(path, 1, 1, "AGENTS.md is empty")];
+            return vec![
+                Diagnostic::error(path, 1, 1, "AGENTS.md is empty")
+                    .with_rule("opencode/content/empty", Difficulty::Easy),
+            ];
         }
         vec![]
     }
@@ -27,12 +30,10 @@ impl Validator for OpenCodeJsonValidator {
 
     fn validate(&self, path: &Path, src: &str) -> Vec<Diagnostic> {
         if let Err(e) = serde_json::from_str::<serde_json::Value>(src) {
-            return vec![Diagnostic::error(
-                path,
-                e.line(),
-                e.column(),
-                format!("invalid JSON: {e}"),
-            )];
+            return vec![
+                Diagnostic::error(path, e.line(), e.column(), format!("invalid JSON: {e}"))
+                    .with_rule("opencode/config/invalid-json", Difficulty::Easy),
+            ];
         }
         vec![]
     }

@@ -1,4 +1,4 @@
-use agentlint_core::Diagnostic;
+use agentlint_core::{Diagnostic, Difficulty};
 use std::path::Path;
 
 pub struct SettingsValidator;
@@ -68,19 +68,20 @@ impl SettingsValidator {
         let value: serde_json::Value = match serde_json::from_str(src) {
             Ok(v) => v,
             Err(e) => {
-                return vec![Diagnostic::error(path, 1, 1, format!("invalid JSON: {e}"))];
+                return vec![
+                    Diagnostic::error(path, 1, 1, format!("invalid JSON: {e}"))
+                        .with_rule("claude/settings/invalid-json", Difficulty::Easy),
+                ];
             }
         };
 
         let obj = match value.as_object() {
             Some(o) => o,
             None => {
-                return vec![Diagnostic::error(
-                    path,
-                    1,
-                    1,
-                    "settings must be a JSON object",
-                )];
+                return vec![
+                    Diagnostic::error(path, 1, 1, "settings must be a JSON object")
+                        .with_rule("claude/settings/invalid-json", Difficulty::Easy),
+                ];
             }
         };
 
@@ -89,12 +90,10 @@ impl SettingsValidator {
         // Unknown top-level keys.
         for key in obj.keys() {
             if !KNOWN_KEYS.contains(&key.as_str()) {
-                diags.push(Diagnostic::error(
-                    path,
-                    1,
-                    1,
-                    format!("unknown top-level key '{key}'"),
-                ));
+                diags.push(
+                    Diagnostic::error(path, 1, 1, format!("unknown top-level key '{key}'"))
+                        .with_rule("claude/settings/unknown-key", Difficulty::Hard),
+                );
             }
         }
 
@@ -104,13 +103,16 @@ impl SettingsValidator {
             .and_then(|v| v.as_bool())
             .unwrap_or(false)
         {
-            diags.push(Diagnostic::warning(
-                path,
-                1,
-                1,
-                "skipDangerousModePermissionPrompt is true: all permission prompts are \
-                 disabled globally; consider scoping with permissions.allow instead",
-            ));
+            diags.push(
+                Diagnostic::warning(
+                    path,
+                    1,
+                    1,
+                    "skipDangerousModePermissionPrompt is true: all permission prompts are \
+                     disabled globally; consider scoping with permissions.allow instead",
+                )
+                .with_rule("claude/settings/skip-dangerous-mode", Difficulty::Hard),
+            );
         }
 
         // permissions.allow / permissions.deny must be arrays of strings.
@@ -119,12 +121,15 @@ impl SettingsValidator {
                 if let Some(v) = perms.get(field)
                     && !is_array_of_strings(v)
                 {
-                    diags.push(Diagnostic::error(
-                        path,
-                        1,
-                        1,
-                        format!("permissions.{field} must be an array of strings"),
-                    ));
+                    diags.push(
+                        Diagnostic::error(
+                            path,
+                            1,
+                            1,
+                            format!("permissions.{field} must be an array of strings"),
+                        )
+                        .with_rule("claude/settings/invalid-permissions", Difficulty::Easy),
+                    );
                 }
             }
 
@@ -153,15 +158,21 @@ impl SettingsValidator {
                     let inner = match group.get("hooks").and_then(|v| v.as_array()) {
                         Some(h) => h,
                         None => {
-                            diags.push(Diagnostic::error(
-                                path,
-                                1,
-                                1,
-                                format!(
-                                    "hooks.{event}[{gi}] (matcher: {matcher:?}) \
-                                     must have a 'hooks' array"
+                            diags.push(
+                                Diagnostic::error(
+                                    path,
+                                    1,
+                                    1,
+                                    format!(
+                                        "hooks.{event}[{gi}] (matcher: {matcher:?}) \
+                                         must have a 'hooks' array"
+                                    ),
+                                )
+                                .with_rule(
+                                    "claude/settings/hook-missing-hooks-array",
+                                    Difficulty::Easy,
                                 ),
-                            ));
+                            );
                             continue;
                         }
                     };
@@ -169,31 +180,40 @@ impl SettingsValidator {
                     // Structural check: each inner hook needs a command.
                     for (hi, hook) in inner.iter().enumerate() {
                         if hook.get("command").and_then(|v| v.as_str()).is_none() {
-                            diags.push(Diagnostic::error(
-                                path,
-                                1,
-                                1,
-                                format!(
-                                    "hooks.{event}[{gi}].hooks[{hi}] \
-                                     must have a 'command' string field"
+                            diags.push(
+                                Diagnostic::error(
+                                    path,
+                                    1,
+                                    1,
+                                    format!(
+                                        "hooks.{event}[{gi}].hooks[{hi}] \
+                                         must have a 'command' string field"
+                                    ),
+                                )
+                                .with_rule(
+                                    "claude/settings/hook-missing-command",
+                                    Difficulty::Easy,
                                 ),
-                            ));
+                            );
                         }
                     }
 
                     // Warn when a matcher has too many hooks (process spawn pressure).
                     if inner.len() > MAX_HOOKS_PER_MATCHER {
-                        diags.push(Diagnostic::warning(
-                            path,
-                            1,
-                            1,
-                            format!(
-                                "hooks.{event} matcher {matcher:?} has {} hooks \
-                                 (>{MAX_HOOKS_PER_MATCHER}); each spawns a subprocess — \
-                                 consider consolidating into a single binary",
-                                inner.len()
-                            ),
-                        ));
+                        diags.push(
+                            Diagnostic::warning(
+                                path,
+                                1,
+                                1,
+                                format!(
+                                    "hooks.{event} matcher {matcher:?} has {} hooks \
+                                     (>{MAX_HOOKS_PER_MATCHER}); each spawns a subprocess — \
+                                     consider consolidating into a single binary",
+                                    inner.len()
+                                ),
+                            )
+                            .with_rule("claude/settings/too-many-hooks", Difficulty::Hard),
+                        );
                     }
 
                     // Check hook commands against warn/error pattern tables.
@@ -201,22 +221,35 @@ impl SettingsValidator {
                         let cmd = hook.get("command").and_then(|v| v.as_str()).unwrap_or("");
                         for (pattern, reason) in WARN_PATTERNS {
                             if cmd.contains(pattern) {
-                                diags.push(Diagnostic::warning(
-                                    path,
-                                    1,
-                                    1,
-                                    format!("hooks.{event} command contains '{pattern}': {reason}"),
-                                ));
+                                diags.push(
+                                    Diagnostic::warning(
+                                        path,
+                                        1,
+                                        1,
+                                        format!(
+                                            "hooks.{event} command contains '{pattern}': {reason}"
+                                        ),
+                                    )
+                                    .with_rule(
+                                        "claude/settings/expensive-hook-command",
+                                        Difficulty::Hard,
+                                    ),
+                                );
                             }
                         }
                         for (pattern, reason) in ERROR_PATTERNS {
                             if cmd.contains(pattern) {
-                                diags.push(Diagnostic::error(
-                                    path,
-                                    1,
-                                    1,
-                                    format!("hooks.{event} command contains '{pattern}': {reason}"),
-                                ));
+                                diags.push(
+                                    Diagnostic::error(
+                                        path,
+                                        1,
+                                        1,
+                                        format!(
+                                            "hooks.{event} command contains '{pattern}': {reason}"
+                                        ),
+                                    )
+                                    .with_rule("claude/settings/sleep-in-hook", Difficulty::Easy),
+                                );
                             }
                         }
                     }
@@ -235,33 +268,42 @@ fn check_allow_entry(path: &Path, entry: &str, diags: &mut Vec<Diagnostic>) {
     if entry.starts_with("Bash(") {
         // Hardcoded credentials via sshpass.
         if entry.contains("sshpass -p") {
-            diags.push(Diagnostic::error(
-                path,
-                1,
-                1,
-                "permissions.allow contains 'sshpass -p': hardcoded credential in allow list; \
-                 use SSH key authentication instead",
-            ));
+            diags.push(
+                Diagnostic::error(
+                    path,
+                    1,
+                    1,
+                    "permissions.allow contains 'sshpass -p': hardcoded credential in allow \
+                     list; use SSH key authentication instead",
+                )
+                .with_rule("claude/settings/sshpass-credential", Difficulty::Easy),
+            );
         }
         // Sleep blocks the agent between tool calls.
         if entry.contains("sleep ") {
-            diags.push(Diagnostic::error(
-                path,
-                1,
-                1,
-                "permissions.allow Bash entry contains 'sleep': sleeping in an allow rule \
-                 stalls the agent; remove or move to an async process",
-            ));
+            diags.push(
+                Diagnostic::error(
+                    path,
+                    1,
+                    1,
+                    "permissions.allow Bash entry contains 'sleep': sleeping in an allow rule \
+                     stalls the agent; remove or move to an async process",
+                )
+                .with_rule("claude/settings/sleep-in-allow", Difficulty::Easy),
+            );
         }
         // Baked-in CI workflow modifications are stale one-off allowances.
         if entry.contains(".github/workflows") {
-            diags.push(Diagnostic::warning(
-                path,
-                1,
-                1,
-                "permissions.allow Bash entry references .github/workflows: CI workflow \
-                 modifications should not be permanently baked into the allow list",
-            ));
+            diags.push(
+                Diagnostic::warning(
+                    path,
+                    1,
+                    1,
+                    "permissions.allow Bash entry references .github/workflows: CI workflow \
+                     modifications should not be permanently baked into the allow list",
+                )
+                .with_rule("claude/settings/ci-workflow-in-allow", Difficulty::Hard),
+            );
         }
     }
 
@@ -272,15 +314,18 @@ fn check_allow_entry(path: &Path, entry: &str, diags: &mut Vec<Diagnostic>) {
             .unwrap_or("")
             .trim_end_matches(')');
         if is_broad_read_path(inner) {
-            diags.push(Diagnostic::warning(
-                path,
-                1,
-                1,
-                format!(
-                    "permissions.allow Read({inner}) grants broad filesystem read access; \
-                     scope to a specific project directory"
-                ),
-            ));
+            diags.push(
+                Diagnostic::warning(
+                    path,
+                    1,
+                    1,
+                    format!(
+                        "permissions.allow Read({inner}) grants broad filesystem read access; \
+                         scope to a specific project directory"
+                    ),
+                )
+                .with_rule("claude/settings/broad-read", Difficulty::Painful),
+            );
         }
     }
 }

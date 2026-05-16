@@ -1,4 +1,4 @@
-use agentlint_core::{Diagnostic, Validator};
+use agentlint_core::{Diagnostic, Difficulty, Validator};
 use agentlint_frontmatter::{ParseError, parse};
 use std::path::Path;
 
@@ -20,12 +20,15 @@ impl Validator for CursorValidator {
         }
         match parse(src) {
             Ok(_) => vec![],
-            Err(ParseError::UnclosedFence) => vec![Diagnostic::error(
-                path,
-                1,
-                1,
-                "unclosed frontmatter fence: missing closing '---'",
-            )],
+            Err(ParseError::UnclosedFence) => vec![
+                Diagnostic::error(
+                    path,
+                    1,
+                    1,
+                    "unclosed frontmatter fence: missing closing '---'",
+                )
+                .with_rule("cursor/frontmatter/unclosed-fence", Difficulty::Easy),
+            ],
             Err(ParseError::NoFence) => vec![],
         }
     }

@@ -1,4 +1,4 @@
-use agentlint_core::{Diagnostic, Validator};
+use agentlint_core::{Diagnostic, Difficulty, Validator};
 use std::path::Path;
 
 pub struct PiValidator;
@@ -14,12 +14,10 @@ impl Validator for PiValidator {
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_else(|| path.to_string_lossy().into_owned());
-            vec![Diagnostic::error(
-                path,
-                1,
-                1,
-                format!("{filename} is empty"),
-            )]
+            vec![
+                Diagnostic::error(path, 1, 1, format!("{filename} is empty"))
+                    .with_rule("pi/content/empty", Difficulty::Easy),
+            ]
         } else {
             vec![]
         }

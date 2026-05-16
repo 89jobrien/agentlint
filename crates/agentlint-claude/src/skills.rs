@@ -1,5 +1,5 @@
 use crate::frontmatter::{self, Field};
-use agentlint_core::Diagnostic;
+use agentlint_core::{Diagnostic, Difficulty};
 use std::path::Path;
 
 pub struct SkillsValidator;
@@ -16,20 +16,26 @@ impl SkillsValidator {
         let fields = match frontmatter::parse(src) {
             Ok(f) => f,
             Err(frontmatter::ParseError::NoFence) => {
-                return vec![Diagnostic::error(
-                    path,
-                    1,
-                    1,
-                    "missing frontmatter: file must start with '---'",
-                )];
+                return vec![
+                    Diagnostic::error(
+                        path,
+                        1,
+                        1,
+                        "missing frontmatter: file must start with '---'",
+                    )
+                    .with_rule("claude/skills/missing-frontmatter", Difficulty::Easy),
+                ];
             }
             Err(frontmatter::ParseError::UnclosedFence) => {
-                return vec![Diagnostic::error(
-                    path,
-                    1,
-                    1,
-                    "unclosed frontmatter fence: missing closing '---'",
-                )];
+                return vec![
+                    Diagnostic::error(
+                        path,
+                        1,
+                        1,
+                        "unclosed frontmatter fence: missing closing '---'",
+                    )
+                    .with_rule("claude/skills/missing-frontmatter", Difficulty::Easy),
+                ];
             }
         };
 
@@ -49,21 +55,17 @@ impl SkillsValidator {
 fn validate_name(path: &Path, fields: &[Field], diagnostics: &mut Vec<Diagnostic>) {
     let field = match fields.iter().find(|f| f.key == "name") {
         None => {
-            diagnostics.push(Diagnostic::error(
-                path,
-                1,
-                1,
-                "missing required field 'name'",
-            ));
+            diagnostics.push(
+                Diagnostic::error(path, 1, 1, "missing required field 'name'")
+                    .with_rule("claude/skills/missing-name", Difficulty::Easy),
+            );
             return;
         }
         Some(f) if f.value.is_empty() => {
-            diagnostics.push(Diagnostic::error(
-                path,
-                f.line,
-                1,
-                "required field 'name' must not be empty",
-            ));
+            diagnostics.push(
+                Diagnostic::error(path, f.line, 1, "required field 'name' must not be empty")
+                    .with_rule("claude/skills/missing-name", Difficulty::Easy),
+            );
             return;
         }
         Some(f) => f,
@@ -72,42 +74,54 @@ fn validate_name(path: &Path, fields: &[Field], diagnostics: &mut Vec<Diagnostic
     let name = &field.value;
 
     if name.len() > 64 {
-        diagnostics.push(Diagnostic::error(
-            path,
-            field.line,
-            1,
-            format!("'name' exceeds 64 characters (got {})", name.len()),
-        ));
+        diagnostics.push(
+            Diagnostic::error(
+                path,
+                field.line,
+                1,
+                format!("'name' exceeds 64 characters (got {})", name.len()),
+            )
+            .with_rule("claude/skills/invalid-name", Difficulty::Easy),
+        );
     }
 
     if !name
         .chars()
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
     {
-        diagnostics.push(Diagnostic::error(
-            path,
-            field.line,
-            1,
-            "'name' must contain only lowercase letters, digits, and hyphens",
-        ));
+        diagnostics.push(
+            Diagnostic::error(
+                path,
+                field.line,
+                1,
+                "'name' must contain only lowercase letters, digits, and hyphens",
+            )
+            .with_rule("claude/skills/invalid-name", Difficulty::Easy),
+        );
     }
 
     if name.starts_with('-') || name.ends_with('-') {
-        diagnostics.push(Diagnostic::error(
-            path,
-            field.line,
-            1,
-            "'name' must not start or end with a hyphen",
-        ));
+        diagnostics.push(
+            Diagnostic::error(
+                path,
+                field.line,
+                1,
+                "'name' must not start or end with a hyphen",
+            )
+            .with_rule("claude/skills/invalid-name", Difficulty::Easy),
+        );
     }
 
     if name.contains("--") {
-        diagnostics.push(Diagnostic::error(
-            path,
-            field.line,
-            1,
-            "'name' must not contain consecutive hyphens",
-        ));
+        diagnostics.push(
+            Diagnostic::error(
+                path,
+                field.line,
+                1,
+                "'name' must not contain consecutive hyphens",
+            )
+            .with_rule("claude/skills/invalid-name", Difficulty::Easy),
+        );
     }
 
     // name must match the skill's directory name (agentskills.io spec).
@@ -118,43 +132,50 @@ fn validate_name(path: &Path, fields: &[Field], diagnostics: &mut Vec<Diagnostic
         .and_then(|n| n.to_str())
         && name != dir_name
     {
-        diagnostics.push(Diagnostic::error(
-            path,
-            field.line,
-            1,
-            format!("'name' ({name}) must match the skill directory name ({dir_name})"),
-        ));
+        diagnostics.push(
+            Diagnostic::error(
+                path,
+                field.line,
+                1,
+                format!("'name' ({name}) must match the skill directory name ({dir_name})"),
+            )
+            .with_rule("claude/skills/invalid-name", Difficulty::Easy),
+        );
     }
 }
 
 fn validate_description(path: &Path, fields: &[Field], diagnostics: &mut Vec<Diagnostic>) {
     match fields.iter().find(|f| f.key == "description") {
         None => {
-            diagnostics.push(Diagnostic::error(
-                path,
-                1,
-                1,
-                "missing required field 'description'",
-            ));
+            diagnostics.push(
+                Diagnostic::error(path, 1, 1, "missing required field 'description'")
+                    .with_rule("claude/skills/missing-description", Difficulty::Easy),
+            );
         }
         Some(f) if f.value.is_empty() => {
-            diagnostics.push(Diagnostic::error(
-                path,
-                f.line,
-                1,
-                "required field 'description' must not be empty",
-            ));
+            diagnostics.push(
+                Diagnostic::error(
+                    path,
+                    f.line,
+                    1,
+                    "required field 'description' must not be empty",
+                )
+                .with_rule("claude/skills/missing-description", Difficulty::Easy),
+            );
         }
         Some(f) if f.value.len() > 1024 => {
-            diagnostics.push(Diagnostic::error(
-                path,
-                f.line,
-                1,
-                format!(
-                    "'description' exceeds 1024 characters (got {})",
-                    f.value.len()
-                ),
-            ));
+            diagnostics.push(
+                Diagnostic::error(
+                    path,
+                    f.line,
+                    1,
+                    format!(
+                        "'description' exceeds 1024 characters (got {})",
+                        f.value.len()
+                    ),
+                )
+                .with_rule("claude/skills/invalid-description", Difficulty::Easy),
+            );
         }
         Some(_) => {}
     }

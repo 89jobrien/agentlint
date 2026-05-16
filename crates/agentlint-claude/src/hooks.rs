@@ -1,4 +1,4 @@
-use agentlint_core::Diagnostic;
+use agentlint_core::{Diagnostic, Difficulty};
 use std::path::Path;
 
 pub struct HooksValidator;
@@ -10,22 +10,28 @@ impl HooksValidator {
         // Must have a shebang on line 1.
         let first_line = src.lines().next().unwrap_or("");
         if !first_line.starts_with("#!") {
-            diags.push(Diagnostic::error(
-                path,
-                1,
-                1,
-                "hook file must have a shebang line (#!) on line 1",
-            ));
+            diags.push(
+                Diagnostic::error(
+                    path,
+                    1,
+                    1,
+                    "hook file must have a shebang line (#!) on line 1",
+                )
+                .with_rule("claude/hooks/missing-shebang", Difficulty::Easy),
+            );
         }
 
         // Must have the execute bit set on Unix.
         if !has_execute_bit(path) {
-            diags.push(Diagnostic::error(
-                path,
-                1,
-                1,
-                "hook file must have the execute bit set (chmod +x)",
-            ));
+            diags.push(
+                Diagnostic::error(
+                    path,
+                    1,
+                    1,
+                    "hook file must have the execute bit set (chmod +x)",
+                )
+                .with_rule("claude/hooks/no-execute-bit", Difficulty::Easy),
+            );
         }
 
         diags

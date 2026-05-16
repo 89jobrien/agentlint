@@ -4,6 +4,72 @@ use std::path::{Path, PathBuf};
 pub mod testing;
 
 // ---------------------------------------------------------------------------
+// Difficulty
+// ---------------------------------------------------------------------------
+
+/// Controls which rules fire. Rules at or below the configured difficulty are
+/// reported; rules above are silently suppressed.
+///
+/// Ordered: `Easy` < `Hard` < `Painful`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
+pub enum Difficulty {
+    /// Definite breakage only: invalid JSON, missing shebang, empty files,
+    /// credential exposure.
+    Easy,
+    /// Breakage + operational problems: hook leaks, dangerous settings,
+    /// missing required fields.
+    #[default]
+    Hard,
+    /// Everything: best-practice style, stale allows, broad permissions,
+    /// naive patterns.
+    Painful,
+}
+
+impl std::fmt::Display for Difficulty {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Difficulty::Easy => write!(f, "easy"),
+            Difficulty::Hard => write!(f, "hard"),
+            Difficulty::Painful => write!(f, "painful"),
+        }
+    }
+}
+
+impl std::str::FromStr for Difficulty {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "easy" => Ok(Difficulty::Easy),
+            "hard" => Ok(Difficulty::Hard),
+            "painful" => Ok(Difficulty::Painful),
+            other => Err(format!(
+                "unknown difficulty '{other}'; expected easy, hard, or painful"
+            )),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RunConfig
+// ---------------------------------------------------------------------------
+
+/// Configuration passed to the runner; controls filtering and output behaviour.
+#[derive(Debug, Clone)]
+pub struct RunConfig {
+    /// Only report diagnostics whose difficulty is ≤ this level.
+    /// Default: `Hard`.
+    pub difficulty: Difficulty,
+}
+
+impl Default for RunConfig {
+    fn default() -> Self {
+        Self {
+            difficulty: Difficulty::Hard,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Diagnostic
 // ---------------------------------------------------------------------------
 
@@ -29,6 +95,11 @@ pub struct Diagnostic {
     pub col: usize,
     pub severity: Severity,
     pub message: String,
+    /// Rule identifier in `<validator>/<category>/<slug>` form. Empty string
+    /// means the rule is unclassified (always shown regardless of difficulty).
+    pub rule: &'static str,
+    /// Difficulty tier that gates this diagnostic.
+    pub difficulty: Difficulty,
 }
 
 impl Diagnostic {
@@ -44,6 +115,8 @@ impl Diagnostic {
             col,
             severity: Severity::Error,
             message: message.into(),
+            rule: "",
+            difficulty: Difficulty::Easy,
         }
     }
 
@@ -59,18 +132,39 @@ impl Diagnostic {
             col,
             severity: Severity::Warning,
             message: message.into(),
+            rule: "",
+            difficulty: Difficulty::Easy,
         }
     }
 
+    /// Set the rule ID and difficulty tier for this diagnostic.
+    pub fn with_rule(mut self, rule: &'static str, difficulty: Difficulty) -> Self {
+        self.rule = rule;
+        self.difficulty = difficulty;
+        self
+    }
+
     pub fn gnu_format(&self) -> String {
-        format!(
-            "{}:{}:{}: {}: {}",
-            self.path.display(),
-            self.line,
-            self.col,
-            self.severity,
-            self.message,
-        )
+        if self.rule.is_empty() {
+            format!(
+                "{}:{}:{}: {}: {}",
+                self.path.display(),
+                self.line,
+                self.col,
+                self.severity,
+                self.message,
+            )
+        } else {
+            format!(
+                "{}:{}:{}: {}[{}]: {}",
+                self.path.display(),
+                self.line,
+                self.col,
+                self.severity,
+                self.rule,
+                self.message,
+            )
+        }
     }
 }
 
@@ -113,6 +207,7 @@ pub struct RunResult {
 pub fn run_on(
     files: impl IntoIterator<Item = (PathBuf, String)>,
     validators: &[Box<dyn Validator>],
+    config: &RunConfig,
 ) -> RunResult {
     let mut diagnostics = Vec::new();
     let mut files_checked = 0;
@@ -128,6 +223,9 @@ pub fn run_on(
         }
     }
 
+    // Filter by difficulty: unclassified (rule="") diagnostics always show.
+    diagnostics.retain(|d| d.rule.is_empty() || d.difficulty <= config.difficulty);
+
     RunResult {
         diagnostics,
         files_checked,
@@ -138,7 +236,7 @@ pub fn run_on(
 /// [`run_on`]. Only files claimed by at least one validator are read; binary
 /// and unrecognised files are silently skipped. Read errors on claimed files
 /// are surfaced as [`Diagnostic::error`] entries rather than panicking.
-pub fn run(roots: &[PathBuf], validators: &[Box<dyn Validator>]) -> RunResult {
+pub fn run(roots: &[PathBuf], validators: &[Box<dyn Validator>], config: &RunConfig) -> RunResult {
     let mut read_errors: Vec<Diagnostic> = Vec::new();
 
     let files: Vec<(PathBuf, String)> = collect_paths(roots)
@@ -158,7 +256,7 @@ pub fn run(roots: &[PathBuf], validators: &[Box<dyn Validator>]) -> RunResult {
         })
         .collect();
 
-    let mut result = run_on(files, validators);
+    let mut result = run_on(files, validators, config);
     // Prepend read errors so they appear before validation diagnostics.
     read_errors.extend(result.diagnostics);
     result.diagnostics = read_errors;
@@ -292,6 +390,8 @@ pub fn format_json(diagnostics: &[Diagnostic]) -> String {
                 "line": d.line,
                 "col": d.col,
                 "severity": d.severity.to_string(),
+                "rule": d.rule,
+                "difficulty": d.difficulty.to_string(),
                 "message": d.message,
             })
         })
