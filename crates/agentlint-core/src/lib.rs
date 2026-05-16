@@ -481,10 +481,10 @@ pub fn format_pretty(diagnostics: &[Diagnostic], color: bool) -> String {
         .map(|p| p.display().to_string() + "/");
 
     let shorten = |p: &str| -> String {
-        if let Some(ref prefix) = cwd {
-            if let Some(rel) = p.strip_prefix(prefix.as_str()) {
-                return rel.to_string();
-            }
+        if let Some(ref prefix) = cwd
+            && let Some(rel) = p.strip_prefix(prefix.as_str())
+        {
+            return rel.to_string();
         }
         p.to_string()
     };

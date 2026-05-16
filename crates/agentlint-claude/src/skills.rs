@@ -110,18 +110,18 @@ fn validate_name(path: &Path, fields: &[Field], diagnostics: &mut Vec<Diagnostic
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
     };
 
-    if let Some(ns) = namespace {
-        if !valid_segment(ns) {
-            diagnostics.push(
-                Diagnostic::error(
-                    path,
-                    field.line,
-                    1,
-                    "namespace part of 'name' must contain only lowercase letters, digits, and hyphens",
-                )
-                .with_rule("claude/skills/invalid-name", Difficulty::Easy),
-            );
-        }
+    if let Some(ns) = namespace
+        && !valid_segment(ns)
+    {
+        diagnostics.push(
+            Diagnostic::error(
+                path,
+                field.line,
+                1,
+                "namespace part of 'name' must contain only lowercase letters, digits, and hyphens",
+            )
+            .with_rule("claude/skills/invalid-name", Difficulty::Easy),
+        );
     }
 
     if !valid_segment(slug) {

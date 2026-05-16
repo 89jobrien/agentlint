@@ -1,6 +1,6 @@
 project: agentlint
 id: agentlint
-updated: "20260515::223403"
+updated: 2026-05-15
 items:
   - id: remaining-validators
     doob_uuid: null
@@ -19,35 +19,15 @@ items:
     completed: null
     extra: []
 log:
-  - date: "20260515::223403"
-    session: 3
-    summary: >-
-      False-positive reduction pass: binary file skip, YAML quote stripping,
-      namespaced skill names, hooks extension allowlist, drop plugin-repo layout
-      detection, per-rule dedup in settings, .maestro skip dir, pretty output
-      format with TTY auto-detect, --version flag, installed to PATH
-    commits:
-      - sha: 8407d6f
-        branch: main
-      - sha: 12b8c49
-        branch: main
-      - sha: b94df69
-        branch: main
-      - sha: e694446
-        branch: main
-      - sha: 1065af6
-        branch: main
-      - sha: 4193817
-        branch: main
-      - sha: 12c1ecd
-        branch: main
-      - sha: ca4f85a
-        branch: main
-  - date: "20260516::213000"
-    session: 2
+  - date: 20260516::213000
     summary: done=3 running=0 pending=1 blocked=0
     commits: []
-  - date: "20260516::003707"
-    session: 1
+    session: 2
+  - date: 20260516::003707
     summary: done=1 running=0 pending=5 blocked=0
     commits: []
+    session: 1
+  - date: 20260515::223403
+    summary: "False-positive reduction pass: binary file skip, YAML quote stripping, namespaced skill names, hooks extension allowlist, drop plugin-repo layout detection, per-rule dedup in settings, .maestro skip dir, pretty output format with TTY auto-detect, --version flag, installed to PATH"
+    commits: []
+    session: 3
