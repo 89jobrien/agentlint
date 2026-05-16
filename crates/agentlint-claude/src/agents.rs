@@ -55,24 +55,19 @@ impl AgentsValidator {
                             );
                         }
                     }
-                    "description" => {
-                        if field.value.len() < 20 {
-                            diags.push(
-                                Diagnostic::warning(
-                                    path,
-                                    field.line,
-                                    1,
-                                    format!(
-                                        "agent description is too short ({} chars, minimum 20)",
-                                        field.value.len()
-                                    ),
-                                )
-                                .with_rule(
-                                    "claude/agents/description-too-short",
-                                    Difficulty::Painful,
+                    "description" if field.value.len() < 20 => {
+                        diags.push(
+                            Diagnostic::warning(
+                                path,
+                                field.line,
+                                1,
+                                format!(
+                                    "agent description is too short ({} chars, minimum 20)",
+                                    field.value.len()
                                 ),
-                            );
-                        }
+                            )
+                            .with_rule("claude/agents/description-too-short", Difficulty::Painful),
+                        );
                     }
                     _ => {}
                 }
