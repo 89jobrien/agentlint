@@ -1,8 +1,9 @@
 use agentlint_core::config::load_config;
 use agentlint_core::{
-    Difficulty, OutputFormat, RunConfig, Validator, format_gnu, format_json, run,
+    Difficulty, OutputFormat, RunConfig, Validator, format_gnu, format_json, format_pretty, run,
 };
 use clap::Parser;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process;
 use std::str::FromStr;
@@ -13,9 +14,9 @@ struct Cli {
     /// Files or directories to validate (defaults to current directory)
     paths: Vec<PathBuf>,
 
-    /// Output format
-    #[arg(long, value_name = "FORMAT", default_value = "gnu")]
-    format: String,
+    /// Output format: pretty | gnu | json (default: pretty when TTY, gnu when piped)
+    #[arg(long, value_name = "FORMAT")]
+    format: Option<String>,
 
     /// Difficulty level: easy | hard | painful (overrides .agentlint.toml)
     #[arg(long, value_name = "LEVEL")]
@@ -29,8 +30,12 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
-    let format = match cli.format.as_str() {
-        "json" => OutputFormat::Json,
+    let is_tty = std::io::stdout().is_terminal();
+    let format = match cli.format.as_deref() {
+        Some("json") => OutputFormat::Json,
+        Some("gnu") => OutputFormat::Gnu,
+        Some("pretty") => OutputFormat::Pretty,
+        None if is_tty => OutputFormat::Pretty,
         _ => OutputFormat::Gnu,
     };
 
@@ -81,8 +86,9 @@ fn main() {
         let output = match format {
             OutputFormat::Gnu => format_gnu(&result.diagnostics),
             OutputFormat::Json => format_json(&result.diagnostics),
+            OutputFormat::Pretty => format_pretty(&result.diagnostics, is_tty),
         };
-        println!("{output}");
+        print!("{output}");
 
         if matches!(format, OutputFormat::Gnu) {
             let errors = result

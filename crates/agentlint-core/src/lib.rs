@@ -224,6 +224,7 @@ pub trait Validator: Send + Sync {
 pub enum OutputFormat {
     Gnu,
     Json,
+    Pretty,
 }
 
 // ---------------------------------------------------------------------------
@@ -449,6 +450,97 @@ pub fn format_gnu(diagnostics: &[Diagnostic]) -> String {
         .map(|d| d.gnu_format())
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// Pretty-print diagnostics grouped by file with ANSI colour.
+///
+/// Pass `color = false` when stdout is not a TTY.
+pub fn format_pretty(diagnostics: &[Diagnostic], color: bool) -> String {
+    use std::collections::BTreeMap;
+
+    // ANSI helpers — empty strings when color is off.
+    let bold = if color { "\x1b[1m" } else { "" };
+    let dim = if color { "\x1b[2m" } else { "" };
+    let red = if color { "\x1b[31m" } else { "" };
+    let yellow = if color { "\x1b[33m" } else { "" };
+    let cyan = if color { "\x1b[36m" } else { "" };
+    let reset = if color { "\x1b[0m" } else { "" };
+
+    // Group by path, preserving insertion order via BTreeMap (sorts paths).
+    let mut by_file: BTreeMap<String, Vec<&Diagnostic>> = BTreeMap::new();
+    for d in diagnostics {
+        by_file
+            .entry(d.path.display().to_string())
+            .or_default()
+            .push(d);
+    }
+
+    // Try to strip cwd prefix for shorter paths.
+    let cwd = std::env::current_dir()
+        .ok()
+        .map(|p| p.display().to_string() + "/");
+
+    let shorten = |p: &str| -> String {
+        if let Some(ref prefix) = cwd {
+            if let Some(rel) = p.strip_prefix(prefix.as_str()) {
+                return rel.to_string();
+            }
+        }
+        p.to_string()
+    };
+
+    let mut out = String::new();
+    let mut total_errors: usize = 0;
+    let mut total_warnings: usize = 0;
+
+    for (path, diags) in &by_file {
+        // File header.
+        out.push_str(&format!("{bold}{cyan}{}{reset}\n", shorten(path)));
+
+        for d in diags {
+            let (sev_color, sev_label) = match d.severity {
+                Severity::Error => (red, "error"),
+                Severity::Warning => (yellow, "warning"),
+            };
+
+            let rule_hint = if d.rule.is_empty() {
+                String::new()
+            } else {
+                format!("  {dim}[{}]{reset}", d.rule)
+            };
+
+            out.push_str(&format!(
+                "  {sev_color}{bold}{sev_label}{reset}  {}{rule_hint}\n",
+                d.message,
+            ));
+
+            match d.severity {
+                Severity::Error => total_errors += 1,
+                Severity::Warning => total_warnings += 1,
+            }
+        }
+        out.push('\n');
+    }
+
+    // Summary line.
+    match (total_errors, total_warnings) {
+        (0, 0) => {}
+        (e, 0) => out.push_str(&format!(
+            "{red}{bold}✖ {e} error{}{reset}\n",
+            if e == 1 { "" } else { "s" }
+        )),
+        (0, w) => out.push_str(&format!(
+            "{yellow}{bold}⚠ {w} warning{}{reset}\n",
+            if w == 1 { "" } else { "s" }
+        )),
+        (e, w) => out.push_str(&format!(
+            "{red}{bold}✖ {e} error{}{reset}  {yellow}{bold}⚠ {w} warning{}{reset}\n",
+            if e == 1 { "" } else { "s" },
+            if w == 1 { "" } else { "s" },
+        )),
+    }
+
+    out
 }
 
 pub fn format_json(diagnostics: &[Diagnostic]) -> String {
