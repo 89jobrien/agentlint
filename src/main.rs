@@ -78,7 +78,10 @@ fn main() {
         Box::new(agentlint_opencode::OpenCodeJsonValidator),
         Box::new(agentlint_gemini::GeminiValidator),
         Box::new(agentlint_pi::PiValidator),
-        Box::new(agentlint_docs::DocsValidator),
+        Box::new(agentlint_docs::DocsValidator::new(
+            agentlint_docs::DocsSchema::from_config_path(std::path::Path::new(".agentlint.toml"))
+                .unwrap_or_default(),
+        )),
     ];
 
     let result = run(&roots, &validators, &config);

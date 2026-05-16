@@ -11,3 +11,6 @@ description = "agentlint validator for docs/**/*.md frontmatter"
 [dependencies]
 agentlint-core        = { workspace = true }
 agentlint-frontmatter = { workspace = true }
+serde                 = { workspace = true }
+serde_yaml            = { workspace = true }
+toml                  = { workspace = true }

@@ -61,7 +61,7 @@ pub fn parse(src: &str) -> Result<Vec<Field>, ParseError> {
         _ => return Err(ParseError::NoFence),
     }
 
-    let mut fields = Vec::new();
+    let mut fields: Vec<Field> = Vec::new();
     let mut closed = false;
 
     for (i, line) in lines {
@@ -70,6 +70,18 @@ pub fn parse(src: &str) -> Result<Vec<Field>, ParseError> {
         if line.trim() == "---" {
             closed = true;
             break;
+        }
+
+        // Indented line — append as continuation of the previous field's value.
+        // Strip leading whitespace so the concatenated value is parseable as YAML.
+        if line.starts_with(' ') || line.starts_with('\t') {
+            if let Some(last) = fields.last_mut() {
+                if !last.value.is_empty() {
+                    last.value.push('\n');
+                }
+                last.value.push_str(line.trim());
+            }
+            continue;
         }
 
         if let Some(field) = parse_field(line, line_num) {
