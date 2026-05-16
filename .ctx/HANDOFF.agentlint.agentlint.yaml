@@ -1,66 +1,7 @@
 project: agentlint
 id: agentlint
-updated: 2026-05-15
+updated: "20260515::223403"
 items:
-  - id: settings-validator-complete
-    doob_uuid: null
-    name: settings-validator-complete
-    priority: P1
-    status: completed
-    title: Claude settings.json validator — hook leak detection + permissions linting
-    description: |-
-      Fully implemented and shipped across two commits (63ce04c, aa23610):
-      - Heuristic hook leak detection: WARN_PATTERNS (cargo, clippy, python3, node,
-        ruby) and ERROR_PATTERNS (sleep) matched against hook command strings
-      - Hook structure validation: real {matcher, hooks:[{type,command}]} shape
-      - Hook count warning: >7 hooks per matcher triggers process-spawn warning
-      - permissions.allow content linting: sshpass credentials (error), sleep in
-        allow (error), .github/workflows modification (warning), overly broad
-        Read() permissions ≤3 path components (warning)
-      - skipDangerousModePermissionPrompt: true → warning
-      - cargo WARN_PATTERN fixed to 'cargo ' (with space) to avoid false positives
-        on ~/.cargo/bin/ paths (e.g. coursers binary)
-      - KNOWN_KEYS expanded with all current Claude Code settings keys
-      - 110 tests passing
-    files:
-      - crates/agentlint-claude/src/settings.rs
-    completed: 2026-05-16
-    extra: []
-  - id: glob-and-walker-fixes
-    doob_uuid: null
-    name: glob-and-walker-fixes
-    priority: P1
-    status: completed
-    title: Core walker and glob fixes for real-world repos
-    description: |-
-      - Skip target/, .git/, node_modules/, plugins/ during directory walk
-      - Pre-filter paths against validators before read_to_string (no binary noise)
-      - Glob matching fixed for absolute paths via component-suffix decomposition
-      - FrontmatterValidator: NoFence is error unless only_file filter is set
-      - ClaudeValidator: bare plugin-repo layout (agents/**/*.md etc.) supported
-      - claude_file_kind() finds .claude anywhere in path (installed layout)
-    files:
-      - crates/agentlint-core/src/lib.rs
-      - crates/agentlint-claude/src/lib.rs
-      - crates/agentlint-frontmatter/src/builder.rs
-    completed: 2026-05-16
-    extra: []
-  - id: pre-commit-gate-fix
-    doob_uuid: null
-    name: pre-commit-gate-fix
-    priority: P2
-    status: completed
-    title: Fix godmode pre-commit-gate deadlock on fmt+commit pipelines
-    description: |-
-      Naive `str contains "git commit"` blocked commands like
-      `cargo fmt --all && git commit -m "..."` before fmt could run.
-      Fixed by splitting on pipeline operators (&&, ;, |) and checking
-      whether any segment starts with `git commit` or `git -C ... commit`.
-      Patched both plugin cache copies and upstreamed to godmode repo (eebcf4b).
-    files:
-      - hooks/scripts/pre-commit-gate.nu
-    completed: 2026-05-16
-    extra: []
   - id: remaining-validators
     doob_uuid: null
     name: remaining-validators
@@ -78,9 +19,35 @@ items:
     completed: null
     extra: []
 log:
-  - date: "20260516.213000"
+  - date: "20260515::223403"
+    session: 3
+    summary: >-
+      False-positive reduction pass: binary file skip, YAML quote stripping,
+      namespaced skill names, hooks extension allowlist, drop plugin-repo layout
+      detection, per-rule dedup in settings, .maestro skip dir, pretty output
+      format with TTY auto-detect, --version flag, installed to PATH
+    commits:
+      - sha: 8407d6f
+        branch: main
+      - sha: 12b8c49
+        branch: main
+      - sha: b94df69
+        branch: main
+      - sha: e694446
+        branch: main
+      - sha: 1065af6
+        branch: main
+      - sha: 4193817
+        branch: main
+      - sha: 12c1ecd
+        branch: main
+      - sha: ca4f85a
+        branch: main
+  - date: "20260516::213000"
+    session: 2
     summary: done=3 running=0 pending=1 blocked=0
     commits: []
-  - date: "20260516.003707"
+  - date: "20260516::003707"
+    session: 1
     summary: done=1 running=0 pending=5 blocked=0
     commits: []
