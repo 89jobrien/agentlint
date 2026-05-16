@@ -48,6 +48,67 @@ pub fn validate_server_entry(
         );
     }
 
+    if let Some(cmd) = server.get("command").and_then(|v| v.as_str())
+        && (cmd.starts_with("./") || cmd.starts_with("../"))
+    {
+        diags.push(
+            Diagnostic::warning(
+                path,
+                1,
+                1,
+                format!(
+                    "mcpServers.{name}: 'command' is a relative path ({cmd:?}); \
+                     relative paths break when Claude Code is launched from a \
+                     different working directory — use an absolute path instead"
+                ),
+            )
+            .with_rule("claude/mcp/relative-command", Difficulty::Hard),
+        );
+    }
+
+    // Detect unconstrained HTTP fetch tools.
+    {
+        let name_lc = name.to_lowercase();
+        let cmd_lc = server
+            .get("command")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let args_lc = server
+            .get("args")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+                    .to_lowercase()
+            })
+            .unwrap_or_default();
+
+        let name_matches = name_lc.contains("fetch") || name_lc.contains("http");
+        let cmd_matches = cmd_lc.contains("mcp-server-fetch")
+            || cmd_lc.contains("mcp-fetch")
+            || args_lc.contains("mcp-server-fetch")
+            || args_lc.contains("mcp-fetch");
+
+        if name_matches || cmd_matches {
+            diags.push(
+                Diagnostic::warning(
+                    path,
+                    1,
+                    1,
+                    format!(
+                        "mcpServers.{name}: appears to be an unconstrained HTTP fetch tool; \
+                         fetch MCP servers can be used to exfiltrate data or make arbitrary \
+                         network requests — ensure this is intentional and scoped"
+                    ),
+                )
+                .with_rule("claude/mcp/fetch-server", Difficulty::Hard),
+            );
+        }
+    }
+
     if let Some(env) = server.get("env").and_then(|v| v.as_object()) {
         for (key, val) in env {
             if let Some(s) = val.as_str()
@@ -220,6 +281,67 @@ mod tests {
                 .any(|d| d.message.contains("op://")
                     && d.severity == agentlint_core::Severity::Warning),
             "expected op:// warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn relative_command_dot_slash_is_warning() {
+        let src = r#"{"mcpServers": {"s": {"command": "./scripts/mcp-server"}}}"#;
+        let diags = McpValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags.iter().any(|d| d.rule == "claude/mcp/relative-command"
+                && d.severity == agentlint_core::Severity::Warning),
+            "expected relative-command warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn relative_command_dot_dot_slash_is_warning() {
+        let src = r#"{"mcpServers": {"s": {"command": "../bin/server"}}}"#;
+        let diags = McpValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/mcp/relative-command"),
+            "expected relative-command warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn absolute_command_is_clean() {
+        let src = r#"{"mcpServers": {"s": {"command": "/usr/local/bin/server"}}}"#;
+        assert_clean(&McpValidator::validate(Path::new(PATH), src));
+    }
+
+    #[test]
+    fn fetch_server_name_is_warning() {
+        let src = r#"{"mcpServers": {"mcp-fetch": {"command": "node", "args": ["server.js"]}}}"#;
+        let diags = McpValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags.iter().any(|d| d.rule == "claude/mcp/fetch-server"
+                && d.severity == agentlint_core::Severity::Warning),
+            "expected fetch-server warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn fetch_server_command_is_warning() {
+        let src =
+            r#"{"mcpServers": {"my-server": {"command": "npx", "args": ["mcp-server-fetch"]}}}"#;
+        let diags = McpValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags.iter().any(|d| d.rule == "claude/mcp/fetch-server"),
+            "expected fetch-server warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn http_in_server_name_is_warning() {
+        let src = r#"{"mcpServers": {"http-proxy": {"command": "node", "args": ["proxy.js"]}}}"#;
+        let diags = McpValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags.iter().any(|d| d.rule == "claude/mcp/fetch-server"),
+            "expected fetch-server warning, got: {diags:?}"
         );
     }
 
