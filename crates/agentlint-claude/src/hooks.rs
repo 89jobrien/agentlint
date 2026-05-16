@@ -48,6 +48,8 @@ impl HooksValidator {
         }
 
         check_naive_str_match(path, src, &mut diags);
+        check_no_exit_code(path, src, &mut diags);
+        check_infinite_loop(path, src, &mut diags);
 
         diags
     }
@@ -145,6 +147,141 @@ fn check_naive_str_match(path: &Path, src: &str, diags: &mut Vec<Diagnostic>) {
             ),
         )
         .with_rule("claude/hooks/naive-str-match", Difficulty::Normal),
+    );
+}
+
+// ---------------------------------------------------------------------------
+// no-exit-code-check detector
+// ---------------------------------------------------------------------------
+
+const HEAVY_COMMANDS: &[&str] = &[
+    "cargo ", "git ", "npm ", "make ", "docker ", "kubectl ", "yarn ", "pip ", "go ",
+];
+
+const EXIT_CODE_GUARDS: &[&str] = &[
+    "if.*exit_code",
+    "| complete",
+    ".exit_code",
+    "$?",
+    "exit_code != 0",
+    "exit_code == 0",
+    "$status",
+    "PIPESTATUS",
+    "|| exit",
+    "|| return",
+    "&& exit",
+];
+
+const UNCONDITIONAL_APPROVE: &[&str] = &[
+    "\"approve\"",
+    "permissionDecision.*approve",
+    "\"decision\": \"approve\"",
+    "\"decision\":\"approve\"",
+    "'approve'",
+];
+
+fn has_heavy_command(src: &str) -> bool {
+    HEAVY_COMMANDS.iter().any(|p| src.contains(p))
+}
+
+fn has_unconditional_approve(src: &str) -> bool {
+    UNCONDITIONAL_APPROVE.iter().any(|p| src.contains(p))
+}
+
+fn has_exit_code_guard(src: &str) -> bool {
+    // Some guards are plain strings, some are pseudo-regex — just do substring match here.
+    EXIT_CODE_GUARDS.iter().any(|p| src.contains(p))
+}
+
+fn check_no_exit_code(path: &Path, src: &str, diags: &mut Vec<Diagnostic>) {
+    if !has_heavy_command(src) {
+        return;
+    }
+    if !has_unconditional_approve(src) {
+        return;
+    }
+    if has_exit_code_guard(src) {
+        return;
+    }
+    // Find the line with the first heavy command for reporting.
+    let line = src
+        .lines()
+        .enumerate()
+        .find(|(_, l)| HEAVY_COMMANDS.iter().any(|p| l.contains(p)))
+        .map(|(i, _)| i + 1)
+        .unwrap_or(1);
+    diags.push(
+        Diagnostic::warning(
+            path,
+            line,
+            1,
+            "hook runs an external command but outputs an unconditional approve without \
+             checking the exit code; add an exit-code guard (e.g. `| complete`, `$?`, \
+             `|| exit 1`) before approving",
+        )
+        .with_rule("claude/hooks/no-exit-code-check", Difficulty::Hard),
+    );
+}
+
+// ---------------------------------------------------------------------------
+// infinite-loop detector
+// ---------------------------------------------------------------------------
+
+const BASH_TOOL_MATCH_PATTERNS: &[&str] = &[
+    "\"Bash\"",
+    "'Bash'",
+    "tool_name.*Bash",
+    "Bash.*tool_name",
+    "tool_name == \"Bash\"",
+    "tool_name == 'Bash'",
+];
+
+fn is_post_tool_use_hook(path: &Path) -> bool {
+    let s = path.to_string_lossy();
+    s.contains("PostToolUse") || s.contains("post-") || s.contains("post_")
+}
+
+fn matches_bash_tool(src: &str) -> bool {
+    BASH_TOOL_MATCH_PATTERNS.iter().any(|p| src.contains(p))
+}
+
+fn check_infinite_loop(path: &Path, src: &str, diags: &mut Vec<Diagnostic>) {
+    if !is_post_tool_use_hook(path) {
+        return;
+    }
+    if !matches_bash_tool(src) {
+        return;
+    }
+    if !has_heavy_command(src) {
+        return;
+    }
+    // Re-entrancy guard check.
+    const REENTRY_GUARDS: &[&str] = &[
+        "AGENTLINT_HOOK_RUNNING",
+        "HOOK_RUNNING",
+        "RUNNING",
+        "__HOOK_",
+    ];
+    if REENTRY_GUARDS.iter().any(|g| src.contains(g)) {
+        return;
+    }
+    let line = src
+        .lines()
+        .enumerate()
+        .find(|(_, l)| BASH_TOOL_MATCH_PATTERNS.iter().any(|p| l.contains(p)))
+        .map(|(i, _)| i + 1)
+        .unwrap_or(1);
+    diags.push(
+        Diagnostic::warning(
+            path,
+            line,
+            1,
+            "PostToolUse hook matches on Bash and runs shell commands (cargo/git/npm) that \
+             would re-trigger this hook, causing an infinite loop; add a re-entrancy guard \
+             (e.g. check/set `AGENTLINT_HOOK_RUNNING` env var) or avoid running Bash \
+             commands from a Bash PostToolUse hook",
+        )
+        .with_rule("claude/hooks/infinite-loop", Difficulty::Hard),
     );
 }
 
@@ -254,6 +391,110 @@ mod tests {
                    let val = \"some fixed string\"\n\
                    if ($val | str contains \"foo\") { exit 0 }\n";
         assert!(diags_for(src).is_empty(), "no stdin read — should not warn");
+    }
+
+    // --- no-exit-code-check tests ---
+
+    fn exit_code_diags(path: &str, src: &str) -> Vec<Diagnostic> {
+        HooksValidator::validate(Path::new(path), src)
+            .into_iter()
+            .filter(|d| d.rule == "claude/hooks/no-exit-code-check")
+            .collect()
+    }
+
+    #[test]
+    fn no_exit_code_check_warns_when_cargo_and_approve_no_guard() {
+        let src = "#!/usr/bin/env bash\ncargo build\necho '{\"decision\":\"approve\"}'\n";
+        let diags = exit_code_diags("/tmp/my-hook", src);
+        assert!(!diags.is_empty(), "expected no-exit-code-check warning");
+    }
+
+    #[test]
+    fn no_exit_code_check_clean_when_guard_present() {
+        let src = "#!/usr/bin/env bash\n\
+                   result=$(cargo build 2>&1)\n\
+                   if [ $? -ne 0 ]; then exit 1; fi\n\
+                   echo '{\"decision\":\"approve\"}'\n";
+        let diags = exit_code_diags("/tmp/my-hook", src);
+        assert!(
+            diags.is_empty(),
+            "exit-code guard present — should be clean"
+        );
+    }
+
+    #[test]
+    fn no_exit_code_check_clean_when_no_approve() {
+        let src = "#!/usr/bin/env bash\ncargo build\necho done\n";
+        let diags = exit_code_diags("/tmp/my-hook", src);
+        assert!(diags.is_empty(), "no approve output — should be clean");
+    }
+
+    #[test]
+    fn no_exit_code_check_nu_pipe_complete_is_clean() {
+        let src = "#!/usr/bin/env nu\n\
+                   let r = cargo build | complete\n\
+                   if $r.exit_code != 0 { exit 1 }\n\
+                   echo '{\"decision\":\"approve\"}'\n";
+        let diags = exit_code_diags("/tmp/my-hook", src);
+        assert!(diags.is_empty(), "| complete guard — should be clean");
+    }
+
+    // --- infinite-loop tests ---
+
+    fn loop_diags(path: &str, src: &str) -> Vec<Diagnostic> {
+        HooksValidator::validate(Path::new(path), src)
+            .into_iter()
+            .filter(|d| d.rule == "claude/hooks/infinite-loop")
+            .collect()
+    }
+
+    #[test]
+    fn infinite_loop_warns_on_bash_post_hook_running_cargo() {
+        let src = "#!/usr/bin/env bash\n\
+                   tool=$(cat /dev/stdin | jq -r '.tool_name')\n\
+                   if [ \"$tool\" = \"Bash\" ]; then\n\
+                     cargo fmt\n\
+                   fi\n";
+        let diags = loop_diags("/hooks/post-tool.sh", src);
+        assert!(!diags.is_empty(), "expected infinite-loop warning");
+    }
+
+    #[test]
+    fn infinite_loop_clean_with_reentry_guard() {
+        let src = "#!/usr/bin/env bash\n\
+                   [ -n \"$AGENTLINT_HOOK_RUNNING\" ] && exit 0\n\
+                   export AGENTLINT_HOOK_RUNNING=1\n\
+                   tool=$(cat /dev/stdin | jq -r '.tool_name')\n\
+                   if [ \"$tool\" = \"Bash\" ]; then\n\
+                     cargo fmt\n\
+                   fi\n";
+        let diags = loop_diags("/hooks/post-tool.sh", src);
+        assert!(
+            diags.is_empty(),
+            "re-entrancy guard present — should be clean"
+        );
+    }
+
+    #[test]
+    fn infinite_loop_clean_when_not_post_hook() {
+        let src = "#!/usr/bin/env bash\n\
+                   tool=$(cat /dev/stdin | jq -r '.tool_name')\n\
+                   if [ \"$tool\" = \"Bash\" ]; then\n\
+                     cargo fmt\n\
+                   fi\n";
+        let diags = loop_diags("/hooks/pre-tool.sh", src);
+        assert!(diags.is_empty(), "not a PostToolUse hook — should be clean");
+    }
+
+    #[test]
+    fn infinite_loop_clean_when_no_bash_match() {
+        let src = "#!/usr/bin/env bash\n\
+                   tool=$(cat /dev/stdin | jq -r '.tool_name')\n\
+                   if [ \"$tool\" = \"Edit\" ]; then\n\
+                     cargo fmt\n\
+                   fi\n";
+        let diags = loop_diags("/hooks/post-tool.sh", src);
+        assert!(diags.is_empty(), "matches Edit not Bash — should be clean");
     }
 
     #[cfg(unix)]
