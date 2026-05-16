@@ -1,59 +1,56 @@
 project: agentlint
 id: agentlint
-updated: 20260516.004845
+updated: 2026-05-16
 items: []
 log:
-  - date: 20260516.004845
+  - date: null
+    summary: "shipped v0.5.0: gemini/pi/opencode structural coverage — no-heading, too-sparse, no-commands-section (#51 #52 #53); 257 tests passing"
+    commits:
+      - !Object
+        sha: 21e1698
+        branch: main
+      - !Object
+        sha: b22d088
+        branch: main
     session: 6
-    summary: >-
-      shipped v0.5.0: gemini/pi/opencode structural coverage — no-heading, too-sparse,
-      no-commands-section (#51 #52 #53); 257 tests passing
+  - date: null
+    summary: "shipped v0.4.1: sentinel review pass — applied 4 suggestions and fixed 2 blocking issues (cursorrules never-fires gate, Bash(**) detection, alwaysApply case-insensitive, run word-boundary, message clarity, interaction test); 228 tests"
     commits:
-      - sha: 21e1698
+      - !Object
+        sha: a567bf8
         branch: main
-      - sha: b22d088
+      - !Object
+        sha: af146e9
         branch: main
-  - date: 20260516.003108
+      - !Object
+        sha: 393cb68
+        branch: main
     session: 5
-    summary: >-
-      shipped v0.4.1: sentinel review pass — applied 4 suggestions and fixed 2 blocking
-      issues (cursorrules never-fires gate, Bash(**) detection, alwaysApply
-      case-insensitive, run word-boundary, message clarity, interaction test); 228 tests
+  - date: null
+    summary: "shipped v0.4.0: broad-bash-allow (#47), cursor never-fires (#48), cursor unknown-key (#49), codex no-commands-section (#50); all issues closed; 225 tests passing"
     commits:
-      - sha: a567bf8
+      - !Object
+        sha: 65e5995
         branch: main
-      - sha: af146e9
+      - !Object
+        sha: d268a9f
         branch: main
-      - sha: 393cb68
+      - !Object
+        sha: b1ff07d
         branch: main
-  - date: 20260516.001948
+      - !Object
+        sha: 12ace45
+        branch: main
     session: 4
-    summary: >-
-      shipped v0.4.0: broad-bash-allow (#47), cursor never-fires (#48),
-      cursor unknown-key (#49), codex no-commands-section (#50); all issues closed;
-      225 tests passing
-    commits:
-      - sha: 65e5995
-        branch: main
-      - sha: d268a9f
-        branch: main
-      - sha: b1ff07d
-        branch: main
-      - sha: 12ace45
-        branch: main
-  - date: 20260516.213000
-    session: 3
+  - date: null
     summary: done=3 running=0 pending=1 blocked=0
     commits: []
-  - date: 20260516.003707
-    session: 2
+    session: 3
+  - date: null
     summary: done=1 running=0 pending=5 blocked=0
     commits: []
-  - date: 20260515.223403
-    session: 1
-    summary: >-
-      False-positive reduction pass: binary file skip, YAML quote stripping,
-      namespaced skill names, hooks extension allowlist, drop plugin-repo layout
-      detection, per-rule dedup in settings, .maestro skip dir, pretty output
-      format with TTY auto-detect, --version flag, installed to PATH
+    session: 2
+  - date: null
+    summary: "False-positive reduction pass: binary file skip, YAML quote stripping, namespaced skill names, hooks extension allowlist, drop plugin-repo layout detection, per-rule dedup in settings, .maestro skip dir, pretty output format with TTY auto-detect, --version flag, installed to PATH"
     commits: []
+    session: 1
