@@ -308,17 +308,21 @@ pub fn run(roots: &[PathBuf], validators: &[Box<dyn Validator>], config: &RunCon
     let files: Vec<(PathBuf, String)> = collect_paths(roots)
         .into_iter()
         .filter(|path| !find_validators(path, validators).is_empty())
-        .filter_map(|path| match std::fs::read_to_string(&path) {
-            Ok(src) => Some((path, src)),
-            Err(e) => {
-                read_errors.push(Diagnostic::error(
-                    &path,
-                    1,
-                    1,
-                    format!("could not read file: {e}"),
-                ));
-                None
-            }
+        .filter_map(|path| {
+            let bytes = match std::fs::read(&path) {
+                Ok(b) => b,
+                Err(e) => {
+                    read_errors.push(Diagnostic::error(
+                        &path,
+                        1,
+                        1,
+                        format!("could not read file: {e}"),
+                    ));
+                    return None;
+                }
+            };
+            // Silently skip binary files — only text files are lintable.
+            String::from_utf8(bytes).ok().map(|src| (path, src))
         })
         .collect();
 

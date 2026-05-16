@@ -99,9 +99,19 @@ fn parse_field(line: &str, line_num: usize) -> Option<Field> {
     let (rest, k) = key(input).ok()?;
     let (value_str, _) = colon_sep(rest).ok()?;
 
+    let value = value_str.trim();
+    // Strip a single layer of YAML quoting (" or ') if the value is fully quoted.
+    let value = if (value.starts_with('"') && value.ends_with('"'))
+        || (value.starts_with('\'') && value.ends_with('\''))
+    {
+        &value[1..value.len() - 1]
+    } else {
+        value
+    };
+
     Some(Field {
         key: k.to_string(),
-        value: value_str.trim().to_string(),
+        value: value.to_string(),
         line: line_num,
     })
 }

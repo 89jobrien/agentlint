@@ -1,6 +1,6 @@
 project: agentlint
 id: agentlint
-updated: 2026-05-16
+updated: 2026-05-15
 items:
   - id: settings-validator-complete
     doob_uuid: null
@@ -24,7 +24,7 @@ items:
       - 110 tests passing
     files:
       - crates/agentlint-claude/src/settings.rs
-    completed: "2026-05-16"
+    completed: 2026-05-16
     extra: []
   - id: glob-and-walker-fixes
     doob_uuid: null
@@ -43,7 +43,7 @@ items:
       - crates/agentlint-core/src/lib.rs
       - crates/agentlint-claude/src/lib.rs
       - crates/agentlint-frontmatter/src/builder.rs
-    completed: "2026-05-16"
+    completed: 2026-05-16
     extra: []
   - id: pre-commit-gate-fix
     doob_uuid: null
@@ -59,7 +59,7 @@ items:
       Patched both plugin cache copies and upstreamed to godmode repo (eebcf4b).
     files:
       - hooks/scripts/pre-commit-gate.nu
-    completed: "2026-05-16"
+    completed: 2026-05-16
     extra: []
   - id: remaining-validators
     doob_uuid: null
@@ -78,12 +78,9 @@ items:
     completed: null
     extra: []
 log:
+  - date: "20260516.213000"
+    summary: done=3 running=0 pending=1 blocked=0
+    commits: []
   - date: "20260516.003707"
     summary: done=1 running=0 pending=5 blocked=0
     commits: []
-  - date: "20260516.213000"
-    summary: done=3 running=0 pending=1 blocked=0
-    commits:
-      - 63ce04c
-      - aa23610
-      - eebcf4b

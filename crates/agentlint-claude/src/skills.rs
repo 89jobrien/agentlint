@@ -85,52 +85,89 @@ fn validate_name(path: &Path, fields: &[Field], diagnostics: &mut Vec<Diagnostic
         );
     }
 
-    if !name
-        .chars()
-        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-    {
+    // Names may optionally be namespaced: `namespace:slug`.
+    // Each segment must contain only lowercase letters, digits, and hyphens.
+    // At most one colon is permitted (no nested namespaces).
+    let (namespace, slug) = match name.splitn(3, ':').collect::<Vec<_>>().as_slice() {
+        [slug] => (None, *slug),
+        [ns, slug] => (Some(*ns), *slug),
+        _ => {
+            diagnostics.push(
+                Diagnostic::error(
+                    path,
+                    field.line,
+                    1,
+                    "'name' must have at most one namespace separator ':'",
+                )
+                .with_rule("claude/skills/invalid-name", Difficulty::Easy),
+            );
+            return;
+        }
+    };
+
+    let valid_segment = |s: &str| {
+        s.chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    };
+
+    if let Some(ns) = namespace {
+        if !valid_segment(ns) {
+            diagnostics.push(
+                Diagnostic::error(
+                    path,
+                    field.line,
+                    1,
+                    "namespace part of 'name' must contain only lowercase letters, digits, and hyphens",
+                )
+                .with_rule("claude/skills/invalid-name", Difficulty::Easy),
+            );
+        }
+    }
+
+    if !valid_segment(slug) {
         diagnostics.push(
             Diagnostic::error(
                 path,
                 field.line,
                 1,
-                "'name' must contain only lowercase letters, digits, and hyphens",
+                "slug part of 'name' must contain only lowercase letters, digits, and hyphens",
             )
             .with_rule("claude/skills/invalid-name", Difficulty::Easy),
         );
     }
 
-    if name.starts_with('-') || name.ends_with('-') {
+    if slug.starts_with('-') || slug.ends_with('-') {
         diagnostics.push(
             Diagnostic::error(
                 path,
                 field.line,
                 1,
-                "'name' must not start or end with a hyphen",
+                "'name' slug must not start or end with a hyphen",
             )
             .with_rule("claude/skills/invalid-name", Difficulty::Easy),
         );
     }
 
-    if name.contains("--") {
+    if slug.contains("--") {
         diagnostics.push(
             Diagnostic::error(
                 path,
                 field.line,
                 1,
-                "'name' must not contain consecutive hyphens",
+                "'name' slug must not contain consecutive hyphens",
             )
             .with_rule("claude/skills/invalid-name", Difficulty::Easy),
         );
     }
 
-    // name must match the skill's directory name (agentskills.io spec).
+    // The slug must match the skill's directory name (agentskills.io spec).
+    // For `namespace:slug`, only the slug is checked against the dir name.
     // path is `.claude/skills/<skill-name>/SKILL.md`; parent() gives the skill dir.
     if let Some(dir_name) = path
         .parent()
         .and_then(|p| p.file_name())
         .and_then(|n| n.to_str())
-        && name != dir_name
+        && slug != dir_name
     {
         diagnostics.push(
             Diagnostic::error(
@@ -278,6 +315,30 @@ mod tests {
         assert_error_contains(
             &SkillsValidator::validate(Path::new(SKILL_MD), src),
             "must match the skill directory name",
+        );
+    }
+
+    #[test]
+    fn namespaced_name_matching_dir_is_valid() {
+        let src = "---\nname: godmode:my-skill\ndescription: ok\n---\n";
+        assert_clean(&SkillsValidator::validate(Path::new(SKILL_MD), src));
+    }
+
+    #[test]
+    fn namespaced_name_slug_mismatch_is_error() {
+        let src = "---\nname: godmode:other-skill\ndescription: ok\n---\n";
+        assert_error_contains(
+            &SkillsValidator::validate(Path::new(SKILL_MD), src),
+            "must match the skill directory name",
+        );
+    }
+
+    #[test]
+    fn double_namespace_is_error() {
+        let src = "---\nname: a:b:c\ndescription: ok\n---\n";
+        assert_error_contains(
+            &SkillsValidator::validate(Path::new(SKILL_MD), src),
+            "at most one namespace separator",
         );
     }
 
