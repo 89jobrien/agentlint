@@ -246,12 +246,23 @@ pub struct DocsValidator {
     /// Leaked copy of `schema.file_glob` so we can return `&[&str]` from
     /// `patterns()` without lifetime complications.
     glob: &'static str,
+    /// When true, per-file `validate()` is suppressed and `validate_batch()`
+    /// infers a schema from the corpus before validating.
+    infer_mode: bool,
 }
 
 impl DocsValidator {
     pub fn new(schema: DocsSchema) -> Self {
         let glob: &'static str = Box::leak(schema.file_glob.clone().into_boxed_str());
-        Self { schema, glob }
+        Self {
+            schema,
+            glob,
+            infer_mode: false,
+        }
+    }
+
+    pub fn set_infer_mode(&mut self, on: bool) {
+        self.infer_mode = on;
     }
 }
 
@@ -351,6 +362,11 @@ impl Validator for DocsValidator {
     }
 
     fn validate(&self, path: &Path, src: &str) -> Vec<Diagnostic> {
+        // In infer mode, per-file validation is deferred to validate_batch().
+        if self.infer_mode {
+            return vec![];
+        }
+
         let schema = &self.schema;
 
         // Skip files with no frontmatter fence.
@@ -615,6 +631,22 @@ impl Validator for DocsValidator {
 
         diags
     }
+
+    fn validate_batch(&self, files: &[(std::path::PathBuf, String)]) -> Vec<Diagnostic> {
+        if !self.infer_mode {
+            return vec![];
+        }
+        let corpus: Vec<(&Path, &str)> = files
+            .iter()
+            .map(|(p, s)| (p.as_path(), s.as_str()))
+            .collect();
+        let inferred = infer::infer_schema(&corpus);
+        let infer_validator = DocsValidator::new(inferred);
+        files
+            .iter()
+            .flat_map(|(path, src)| infer_validator.validate(path, src))
+            .collect()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -628,6 +660,37 @@ mod tests {
 
     fn v() -> DocsValidator {
         DocsValidator::default()
+    }
+
+    // --- infer mode ---
+
+    #[test]
+    fn infer_mode_produces_diags_from_inferred_schema() {
+        use std::path::PathBuf;
+        // Corpus: three docs all have title+doctype (100%) → both inferred as
+        // required. Fourth doc is missing title → must be flagged.
+        let good = "---\ntitle: agentlint-roadmap\ndoctype: roadmap\nproject: agentlint\n\
+                    status: active\ncreated: 2026-05-16\nupdated: 2026-05-16\n---\n";
+        let missing_title = "---\ndoctype: guide\nproject: agentlint\nstatus: active\n\
+                             created: 2026-05-16\nupdated: 2026-05-16\n---\n";
+        // 4/5 have title (80%) → threshold met; 5th is flagged.
+        let files = vec![
+            (PathBuf::from("docs/roadmap.agentlint.md"), good.to_string()),
+            (PathBuf::from("docs/plan.agentlint.md"), good.to_string()),
+            (PathBuf::from("docs/spec.agentlint.md"), good.to_string()),
+            (PathBuf::from("docs/adr.agentlint.md"), good.to_string()),
+            (
+                PathBuf::from("docs/guide.agentlint.md"),
+                missing_title.to_string(),
+            ),
+        ];
+        let mut v = DocsValidator::default();
+        v.set_infer_mode(true);
+        let diags = v.validate_batch(&files);
+        assert!(
+            diags.iter().any(|d| d.rule.contains("missing-title")),
+            "expected missing-title from inferred schema: {diags:?}"
+        );
     }
 
     // --- serialization round-trip ---
