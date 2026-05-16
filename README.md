@@ -118,7 +118,7 @@ cargo clippy --workspace -- -D warnings
 ```
 
 See [`docs/plans/2026-05-15-agentlint.md`](docs/plans/2026-05-15-agentlint.md) for the
-full design document and [`docs/ROADMAP.agentlint.md`](docs/ROADMAP.agentlint.md) for
+full design document and [`docs/roadmap.agentlint.md`](docs/roadmap.agentlint.md) for
 shipped milestones and planned work.
 
 ## License
