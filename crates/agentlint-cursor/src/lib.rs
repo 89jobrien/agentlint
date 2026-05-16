@@ -50,6 +50,52 @@ impl Validator for CursorValidator {
             );
         }
 
+        // #49 — unknown frontmatter keys
+        const KNOWN_KEYS: &[&str] = &["description", "globs", "alwaysApply"];
+        for field in &fields {
+            if !KNOWN_KEYS.contains(&field.key.as_str()) {
+                diags.push(
+                    Diagnostic::warning(
+                        path,
+                        field.line,
+                        1,
+                        format!(
+                            "unknown frontmatter key '{}'; Cursor only recognises `description`, \
+                             `globs`, and `alwaysApply`",
+                            field.key
+                        ),
+                    )
+                    .with_rule("cursor/frontmatter/unknown-key", Difficulty::Easy),
+                );
+            }
+        }
+
+        // #48 — never-fires: frontmatter present but rule can never auto-apply
+        {
+            let always_apply = fields
+                .iter()
+                .find(|f| f.key == "alwaysApply")
+                .map(|f| f.value.trim() == "true")
+                .unwrap_or(false);
+            let has_globs = fields
+                .iter()
+                .find(|f| f.key == "globs")
+                .map(|f| !f.value.trim().is_empty())
+                .unwrap_or(false);
+            if !always_apply && !has_globs {
+                diags.push(
+                    Diagnostic::warning(
+                        path,
+                        1,
+                        1,
+                        "rule has no `globs` and `alwaysApply` is not set; Cursor will never \
+                         auto-apply this rule — add a `globs` pattern or set `alwaysApply: true`",
+                    )
+                    .with_rule("cursor/frontmatter/never-fires", Difficulty::Easy),
+                );
+            }
+        }
+
         // #40 — invalid globs
         if let Some(globs_field) = fields.iter().find(|f| f.key == "globs") {
             for segment in globs_field.value.split(',') {
@@ -135,9 +181,10 @@ mod tests {
 
     #[test]
     fn well_formed_frontmatter_is_clean() {
-        let src = "---\ntitle: test\ndescription: lint files\n---\n# Body\n";
+        let src = "---\ndescription: lint files\nglobs: **/*.rs\nalwaysApply: false\n---\n# Body\n";
         let diags = v().validate(Path::new("rule.mdc"), src);
-        assert!(diags.is_empty());
+        // globs is non-empty so never-fires does not trigger; all keys are known
+        assert!(diags.is_empty(), "unexpected diags: {diags:?}");
     }
 
     #[test]
@@ -156,13 +203,11 @@ mod tests {
 
     #[test]
     fn missing_description_emits_warning() {
-        let src = "---\ntitle: My Rule\n---\n# Body\n";
+        let src = "---\nglobs: **/*.rs\n---\n# Body\n";
         let diags = v().validate(Path::new("rule.mdc"), src);
-        assert_eq!(diags.len(), 1);
         assert!(
-            diags[0].rule.contains("missing-description"),
-            "rule: {}",
-            diags[0].rule
+            diags.iter().any(|d| d.rule.contains("missing-description")),
+            "expected missing-description, got: {diags:?}"
         );
     }
 
@@ -212,6 +257,84 @@ mod tests {
         assert!(
             diags.iter().any(|d| d.rule.contains("invalid-globs")),
             "no invalid-globs diagnostic: {diags:?}"
+        );
+    }
+
+    // #48 — never-fires
+
+    #[test]
+    fn never_fires_when_no_globs_and_no_always_apply() {
+        let src = "---\ndescription: my rule\n---\n# Body\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            diags.iter().any(|d| d.rule.contains("never-fires")),
+            "expected never-fires diagnostic, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn never_fires_when_globs_empty_and_no_always_apply() {
+        let src = "---\ndescription: my rule\nglobs: \n---\n# Body\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            diags.iter().any(|d| d.rule.contains("never-fires")),
+            "expected never-fires diagnostic, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn always_apply_true_suppresses_never_fires() {
+        let src = "---\ndescription: my rule\nalwaysApply: true\n---\n# Body\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            !diags.iter().any(|d| d.rule.contains("never-fires")),
+            "unexpected never-fires: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn globs_present_suppresses_never_fires() {
+        let src = "---\ndescription: my rule\nglobs: **/*.rs\n---\n# Body\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            !diags.iter().any(|d| d.rule.contains("never-fires")),
+            "unexpected never-fires: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn no_frontmatter_no_never_fires() {
+        let src = "# Just a body\nno frontmatter here\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            !diags.iter().any(|d| d.rule.contains("never-fires")),
+            "unexpected never-fires: {diags:?}"
+        );
+    }
+
+    // #49 — unknown-key
+
+    #[test]
+    fn unknown_key_emits_warning() {
+        let src = "---\ndescription: ok\nglobs: **/*.rs\nfoo: bar\n---\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            diags.iter().any(|d| d.rule.contains("unknown-key")),
+            "expected unknown-key diagnostic, got: {diags:?}"
+        );
+        assert!(
+            diags.iter().any(|d| d.message.contains("foo")),
+            "expected key name in message, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn known_keys_no_unknown_key_warning() {
+        let src = "---\ndescription: ok\nglobs: **/*.rs\nalwaysApply: true\n---\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            !diags.iter().any(|d| d.rule.contains("unknown-key")),
+            "unexpected unknown-key: {diags:?}"
         );
     }
 }
