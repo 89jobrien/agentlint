@@ -1,4 +1,4 @@
-use crate::mcp::validate_server_entry;
+use crate::mcp::{find_duplicate_server_names, validate_server_entry};
 use agentlint_core::{Diagnostic, Difficulty};
 use std::path::Path;
 
@@ -313,6 +313,22 @@ impl SettingsValidator {
                     }
                 }
             }
+        }
+
+        // mcpServers duplicate names (raw scan — serde deduplicates silently).
+        for name in find_duplicate_server_names(src) {
+            diags.push(
+                Diagnostic::warning(
+                    path,
+                    1,
+                    1,
+                    format!(
+                        "mcpServers.{name}: duplicate server name; \
+                         the last entry silently wins — remove the duplicate"
+                    ),
+                )
+                .with_rule("claude/settings/mcp-duplicate-server", Difficulty::Hard),
+            );
         }
 
         // mcpServers entries — validate each server using the shared MCP helper.
@@ -714,6 +730,57 @@ mod tests {
     fn top_level_env_regular_value_is_clean() {
         let src = r#"{"env": {"LOG_LEVEL": "debug"}}"#;
         assert_clean(&SettingsValidator::validate(Path::new(PATH), src));
+    }
+
+    #[test]
+    fn mcp_duplicate_server_name_is_warning() {
+        // Raw JSON with a duplicate key — serde silently drops one.
+        let src = r#"{"mcpServers": {"alpha": {"command": "npx"}, "alpha": {"command": "node"}}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/mcp-duplicate-server"
+                    && d.severity == agentlint_core::Severity::Warning),
+            "expected mcp-duplicate-server warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn mcp_unique_server_names_are_clean() {
+        let src = r#"{"mcpServers": {"alpha": {"command": "npx"}, "beta": {"command": "node"}}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/mcp-duplicate-server"),
+            "unexpected mcp-duplicate-server diagnostic, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn mcp_plaintext_secret_in_env_is_error() {
+        let src = r#"{"mcpServers": {"s": {"command": "node", "env": {"API_KEY": "xXxFAKETOKENxXxABCDEFGHIJKLMNOP1234567"}}}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/mcp-plaintext-secret"
+                    && d.severity == agentlint_core::Severity::Error),
+            "expected mcp-plaintext-secret error, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn mcp_op_ref_in_env_not_flagged_as_plaintext_secret() {
+        let src = r#"{"mcpServers": {"s": {"command": "node", "env": {"API_KEY": "op://Personal/item/field"}}}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/mcp-plaintext-secret"),
+            "op:// ref should not be flagged as plaintext secret, got: {diags:?}"
+        );
     }
 
     #[test]
