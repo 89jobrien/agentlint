@@ -35,7 +35,7 @@ name = "agentlint"
 path = "src/main.rs"
 
 [dependencies]
-agentlint-core     = { path = "crates/agentlint-core",     version = "0.1.0" }
+agentlint-core     = { path = "crates/agentlint-core",     version = "0.1.0", features = ["config"] }
 agentlint-claude   = { path = "crates/agentlint-claude",   version = "0.1.0" }
 agentlint-cursor   = { path = "crates/agentlint-cursor",   version = "0.1.0" }
 agentlint-codex    = { path = "crates/agentlint-codex",    version = "0.1.0" }

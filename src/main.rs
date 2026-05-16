@@ -1,3 +1,4 @@
+use agentlint_core::config::load_config;
 use agentlint_core::{
     Difficulty, OutputFormat, RunConfig, Validator, format_gnu, format_json, run,
 };
@@ -25,20 +26,6 @@ struct Cli {
     exit_zero: bool,
 }
 
-fn load_toml_difficulty() -> Option<Difficulty> {
-    let src = std::fs::read_to_string(".agentlint.toml").ok()?;
-    // Minimal TOML parse: look for `difficulty = "..."` under [agentlint].
-    for line in src.lines() {
-        let line = line.trim();
-        if let Some(rest) = line.strip_prefix("difficulty") {
-            let rest = rest.trim_start_matches([' ', '=']).trim();
-            let val = rest.trim_matches('"');
-            return Difficulty::from_str(val).ok();
-        }
-    }
-    None
-}
-
 fn main() {
     let cli = Cli::parse();
 
@@ -47,21 +34,26 @@ fn main() {
         _ => OutputFormat::Gnu,
     };
 
-    // CLI flag wins; fall back to .agentlint.toml; then default (Hard).
-    let difficulty = cli
-        .difficulty
-        .as_deref()
-        .map(|s| match Difficulty::from_str(s) {
+    // Load base config from .agentlint.toml (if present).
+    let mut config = match load_config(std::path::Path::new(".agentlint.toml")) {
+        Ok(Some(c)) => c,
+        Ok(None) => RunConfig::default(),
+        Err(e) => {
+            eprintln!("agentlint: {e}");
+            process::exit(2);
+        }
+    };
+
+    // CLI --difficulty always wins over config file.
+    if let Some(s) = cli.difficulty.as_deref() {
+        config.difficulty = match Difficulty::from_str(s) {
             Ok(d) => d,
             Err(e) => {
                 eprintln!("agentlint: {e}");
                 process::exit(2);
             }
-        })
-        .or_else(load_toml_difficulty)
-        .unwrap_or(Difficulty::Hard);
-
-    let config = RunConfig { difficulty };
+        };
+    }
 
     let roots: Vec<PathBuf> = if cli.paths.is_empty() {
         vec![PathBuf::from(".")]
@@ -85,11 +77,7 @@ fn main() {
         .iter()
         .any(|d| matches!(d.severity, agentlint_core::Severity::Error));
 
-    if result.diagnostics.is_empty() {
-        if matches!(format, OutputFormat::Gnu) {
-            // silent on clean
-        }
-    } else {
+    if !result.diagnostics.is_empty() {
         let output = match format {
             OutputFormat::Gnu => format_gnu(&result.diagnostics),
             OutputFormat::Json => format_json(&result.diagnostics),

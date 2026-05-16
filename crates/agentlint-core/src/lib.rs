@@ -1,7 +1,34 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "test-utils")]
 pub mod testing;
+
+#[cfg(feature = "config")]
+pub mod config;
+pub use config_types::{IgnoreEntry, RuleOverride};
+
+mod config_types {
+    /// Per-rule severity override from config.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[cfg_attr(feature = "config", derive(serde::Deserialize))]
+    pub enum RuleOverride {
+        #[cfg_attr(feature = "config", serde(rename = "error"))]
+        Error,
+        #[cfg_attr(feature = "config", serde(rename = "warning"))]
+        Warning,
+        #[cfg_attr(feature = "config", serde(rename = "off"))]
+        Off,
+    }
+
+    /// Suppress specific rules for paths whose string representation ends with
+    /// `path`. An empty `rules` vec suppresses all rules for matching paths.
+    #[derive(Debug, Clone)]
+    pub struct IgnoreEntry {
+        pub path: String,
+        pub rules: Vec<String>,
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Difficulty
@@ -59,12 +86,21 @@ pub struct RunConfig {
     /// Only report diagnostics whose difficulty is ≤ this level.
     /// Default: `Hard`.
     pub difficulty: Difficulty,
+    /// Per-rule severity overrides. Keys are rule IDs; values control whether
+    /// the rule is suppressed (`Off`) or its severity is rewritten.
+    pub rule_overrides: HashMap<String, RuleOverride>,
+    /// Path-scoped ignore entries. Diagnostics whose path suffix matches and
+    /// whose rule appears in `rules` (or all rules when `rules` is empty) are
+    /// suppressed.
+    pub ignores: Vec<IgnoreEntry>,
 }
 
 impl Default for RunConfig {
     fn default() -> Self {
         Self {
             difficulty: Difficulty::Hard,
+            rule_overrides: HashMap::new(),
+            ignores: Vec::new(),
         }
     }
 }
@@ -223,11 +259,41 @@ pub fn run_on(
         }
     }
 
-    // Filter by difficulty: unclassified (rule="") diagnostics always show.
+    // 1. Difficulty filter — unclassified diagnostics (rule="") always show.
     diagnostics.retain(|d| d.rule.is_empty() || d.difficulty <= config.difficulty);
 
+    // 2. Ignore filter — path suffix + rule match.
+    diagnostics.retain(|d| {
+        if d.rule.is_empty() {
+            return true; // unclassified always passes
+        }
+        let path_str = d.path.to_string_lossy();
+        for entry in &config.ignores {
+            let matches_path = path_str.ends_with(&entry.path)
+                || path_str.ends_with(&entry.path.replace('/', std::path::MAIN_SEPARATOR_STR));
+            if matches_path && (entry.rules.is_empty() || entry.rules.iter().any(|r| r == d.rule)) {
+                return false;
+            }
+        }
+        true
+    });
+
+    // 3. Override filter — rewrite or suppress severity.
+    let mut kept = Vec::with_capacity(diagnostics.len());
+    for mut d in diagnostics {
+        if !d.rule.is_empty() {
+            match config.rule_overrides.get(d.rule) {
+                Some(RuleOverride::Off) => continue,
+                Some(RuleOverride::Error) => d.severity = Severity::Error,
+                Some(RuleOverride::Warning) => d.severity = Severity::Warning,
+                None => {}
+            }
+        }
+        kept.push(d);
+    }
+
     RunResult {
-        diagnostics,
+        diagnostics: kept,
         files_checked,
     }
 }
@@ -406,6 +472,7 @@ pub fn format_json(diagnostics: &[Diagnostic]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn glob_literal() {
@@ -429,5 +496,201 @@ mod tests {
             ".claude/agents/**/*.md",
             ".claude/agents/bar.md"
         ));
+    }
+
+    // ---------------------------------------------------------------------------
+    // Filtering logic tests
+    // ---------------------------------------------------------------------------
+
+    fn easy_error(path: &str, rule: &'static str) -> Diagnostic {
+        Diagnostic::error(PathBuf::from(path), 1, 1, "msg").with_rule(rule, Difficulty::Easy)
+    }
+
+    fn painful_warning(path: &str, rule: &'static str) -> Diagnostic {
+        Diagnostic::warning(PathBuf::from(path), 1, 1, "msg").with_rule(rule, Difficulty::Painful)
+    }
+
+    fn unclassified(path: &str) -> Diagnostic {
+        Diagnostic::error(PathBuf::from(path), 1, 1, "unclassified")
+    }
+
+    fn run_filters(diagnostics: Vec<Diagnostic>, config: RunConfig) -> Vec<Diagnostic> {
+        // Use run_on with a fixed file set — simulate by calling filtering inline.
+        // We pass no validators since we supply pre-built diagnostics; instead we
+        // replicate the filter logic by running run_on on an empty file set and
+        // verifying the filter path directly via a minimal Validator shim.
+        struct Shim(Vec<Diagnostic>);
+        impl Validator for Shim {
+            fn patterns(&self) -> &[&str] {
+                &["__shim__"]
+            }
+            fn validate(&self, _: &Path, _: &str) -> Vec<Diagnostic> {
+                self.0.clone()
+            }
+        }
+        let files = vec![(PathBuf::from("__shim__"), String::new())];
+        let validators: Vec<Box<dyn Validator>> = vec![Box::new(Shim(diagnostics))];
+        run_on(files, &validators, &config).diagnostics
+    }
+
+    #[test]
+    fn difficulty_filter_drops_painful_at_hard() {
+        let diags = vec![painful_warning(
+            ".claude/settings.json",
+            "claude/settings/broad-read",
+        )];
+        let result = run_filters(diags, RunConfig::default()); // default = Hard
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn difficulty_filter_passes_painful_at_painful() {
+        let diags = vec![painful_warning(
+            ".claude/settings.json",
+            "claude/settings/broad-read",
+        )];
+        let result = run_filters(
+            diags,
+            RunConfig {
+                difficulty: Difficulty::Painful,
+                ..RunConfig::default()
+            },
+        );
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn ignore_filter_suppresses_matching_rule_for_matching_path() {
+        let diags = vec![easy_error(
+            ".claude/settings.local.json",
+            "claude/settings/broad-read",
+        )];
+        let config = RunConfig {
+            ignores: vec![IgnoreEntry {
+                path: ".claude/settings.local.json".into(),
+                rules: vec!["claude/settings/broad-read".into()],
+            }],
+            ..RunConfig::default()
+        };
+        assert!(run_filters(diags, config).is_empty());
+    }
+
+    #[test]
+    fn ignore_filter_empty_rules_suppresses_all_for_path() {
+        let diags = vec![
+            easy_error(".claude/settings.local.json", "claude/settings/broad-read"),
+            easy_error(
+                ".claude/settings.local.json",
+                "claude/settings/sshpass-credential",
+            ),
+        ];
+        let config = RunConfig {
+            ignores: vec![IgnoreEntry {
+                path: ".claude/settings.local.json".into(),
+                rules: vec![],
+            }],
+            ..RunConfig::default()
+        };
+        assert!(run_filters(diags, config).is_empty());
+    }
+
+    #[test]
+    fn ignore_filter_does_not_suppress_different_path() {
+        let diags = vec![easy_error(
+            ".claude/settings.json",
+            "claude/settings/broad-read",
+        )];
+        let config = RunConfig {
+            ignores: vec![IgnoreEntry {
+                path: ".claude/settings.local.json".into(),
+                rules: vec!["claude/settings/broad-read".into()],
+            }],
+            ..RunConfig::default()
+        };
+        assert_eq!(run_filters(diags, config).len(), 1);
+    }
+
+    #[test]
+    fn override_off_drops_diagnostic() {
+        let diags = vec![easy_error(
+            ".claude/settings.json",
+            "claude/settings/unknown-key",
+        )];
+        let config = RunConfig {
+            rule_overrides: [("claude/settings/unknown-key".into(), RuleOverride::Off)]
+                .into_iter()
+                .collect(),
+            ..RunConfig::default()
+        };
+        assert!(run_filters(diags, config).is_empty());
+    }
+
+    #[test]
+    fn override_warning_demotes_error() {
+        let diags = vec![easy_error(
+            ".claude/settings.json",
+            "claude/settings/unknown-key",
+        )];
+        let config = RunConfig {
+            rule_overrides: [("claude/settings/unknown-key".into(), RuleOverride::Warning)]
+                .into_iter()
+                .collect(),
+            ..RunConfig::default()
+        };
+        let result = run_filters(diags, config);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].severity, Severity::Warning);
+    }
+
+    #[test]
+    fn override_error_promotes_warning() {
+        let diags = vec![
+            Diagnostic::warning(PathBuf::from(".claude/settings.json"), 1, 1, "msg")
+                .with_rule("claude/settings/skip-dangerous-mode", Difficulty::Hard),
+        ];
+        let config = RunConfig {
+            rule_overrides: [(
+                "claude/settings/skip-dangerous-mode".into(),
+                RuleOverride::Error,
+            )]
+            .into_iter()
+            .collect(),
+            ..RunConfig::default()
+        };
+        let result = run_filters(diags, config);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].severity, Severity::Error);
+    }
+
+    #[test]
+    fn unclassified_passes_all_filters() {
+        let diags = vec![unclassified("some/path")];
+        let config = RunConfig {
+            difficulty: Difficulty::Easy,
+            rule_overrides: [("".into(), RuleOverride::Off)].into_iter().collect(),
+            ignores: vec![IgnoreEntry {
+                path: "some/path".into(),
+                rules: vec![],
+            }],
+        };
+        // Unclassified should survive even with an empty-rule ignore for its path
+        // because we skip ignore+override for rule="" diagnostics.
+        let result = run_filters(diags, config);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn filter_order_difficulty_before_ignore() {
+        // painful diagnostic — no ignore needed, dropped by difficulty alone
+        let diags = vec![painful_warning(
+            ".claude/settings.json",
+            "claude/settings/broad-read",
+        )];
+        let config = RunConfig {
+            difficulty: Difficulty::Hard,
+            // No ignore entries — if difficulty filter works, this is never reached
+            ..RunConfig::default()
+        };
+        assert!(run_filters(diags, config).is_empty());
     }
 }
