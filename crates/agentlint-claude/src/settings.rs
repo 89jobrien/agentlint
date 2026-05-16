@@ -368,7 +368,12 @@ impl SettingsValidator {
 /// Entry format: `TOOL(SPEC)` e.g. `Bash(git add:*)`, `Read(//Users/joe/**)`.
 fn check_allow_entry(path: &Path, entry: &str, diags: &mut Vec<Diagnostic>) {
     // Bare "Bash" or unconstrained "Bash(*)" / "Bash(*:..." grants unrestricted shell execution.
-    if entry == "Bash" || entry == "Bash(*)" || entry.starts_with("Bash(*:") {
+    if entry == "Bash"
+        || entry == "Bash(*)"
+        || entry == "Bash(**)"
+        || entry.starts_with("Bash(*:")
+        || entry.starts_with("Bash(**:")
+    {
         diags.push(
             Diagnostic::warning(
                 path,
@@ -522,6 +527,19 @@ mod tests {
                 .any(|d| d.rule == "claude/settings/broad-bash-allow"
                     && d.severity == agentlint_core::Severity::Warning),
             "expected broad-bash-allow warning for Bash(*:...), got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn allow_bash_double_star_is_warning() {
+        let src = r#"{"permissions": {"allow": ["Bash(**)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/broad-bash-allow"
+                    && d.severity == agentlint_core::Severity::Warning),
+            "expected broad-bash-allow warning for Bash(**), got: {diags:?}"
         );
     }
 

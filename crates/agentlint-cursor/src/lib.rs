@@ -70,8 +70,13 @@ impl Validator for CursorValidator {
             }
         }
 
-        // #48 — never-fires: frontmatter present but rule can never auto-apply
-        {
+        // #48 — never-fires: frontmatter present but rule can never auto-apply.
+        // Only applies to .mdc/.md rules — .cursorrules does not support globs/alwaysApply.
+        let is_mdc_rule = matches!(
+            path.extension().and_then(|e| e.to_str()),
+            Some("mdc") | Some("md")
+        );
+        if is_mdc_rule {
             let always_apply = fields
                 .iter()
                 .find(|f| f.key == "alwaysApply")
@@ -309,6 +314,17 @@ mod tests {
         assert!(
             !diags.iter().any(|d| d.rule.contains("never-fires")),
             "unexpected never-fires: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn cursorrules_with_frontmatter_no_never_fires() {
+        // .cursorrules does not support globs/alwaysApply — never-fires must not fire here.
+        let src = "---\ndescription: my rule\n---\n# Body\n";
+        let diags = v().validate(Path::new(".cursorrules"), src);
+        assert!(
+            !diags.iter().any(|d| d.rule.contains("never-fires")),
+            "never-fires should not apply to .cursorrules: {diags:?}"
         );
     }
 
