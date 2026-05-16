@@ -60,6 +60,7 @@ dependencies = [
  "agentlint-core",
  "agentlint-frontmatter",
  "serde",
+ "serde_json",
  "serde_yaml",
  "toml",
 ]

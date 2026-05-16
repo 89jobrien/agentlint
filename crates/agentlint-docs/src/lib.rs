@@ -3,7 +3,9 @@ use agentlint_frontmatter::{ParseError, parse};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-const AGENTLINT_DEFAULT_JSON: &str = include_str!("../schemas/agentlint-default.json");
+pub mod plugin;
+
+use plugin::BUILTIN_SRC;
 
 // ---------------------------------------------------------------------------
 // FilenameConvention — configurable naming format
@@ -191,8 +193,8 @@ impl Default for DocsSchema {
             date_fields: Vec<String>,
             conventions: Vec<FilenameConvention>,
         }
-        let raw: Raw = serde_json::from_str(AGENTLINT_DEFAULT_JSON)
-            .expect("bundled agentlint-default.json is valid");
+        let raw: Raw =
+            serde_json::from_str(BUILTIN_SRC).expect("bundled agentlint-default.json is valid");
         Self {
             file_glob: raw.file_glob,
             required_fields: raw.required_fields,

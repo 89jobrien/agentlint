@@ -5,42 +5,15 @@ items: []
 log:
   - date: null
     summary: "shipped v0.5.0: gemini/pi/opencode structural coverage — no-heading, too-sparse, no-commands-section (#51 #52 #53); 257 tests passing"
-    commits:
-      - !Object
-        sha: 21e1698
-        branch: main
-      - !Object
-        sha: b22d088
-        branch: main
+    commits: []
     session: 6
   - date: null
     summary: "shipped v0.4.1: sentinel review pass — applied 4 suggestions and fixed 2 blocking issues (cursorrules never-fires gate, Bash(**) detection, alwaysApply case-insensitive, run word-boundary, message clarity, interaction test); 228 tests"
-    commits:
-      - !Object
-        sha: a567bf8
-        branch: main
-      - !Object
-        sha: af146e9
-        branch: main
-      - !Object
-        sha: 393cb68
-        branch: main
+    commits: []
     session: 5
   - date: null
     summary: "shipped v0.4.0: broad-bash-allow (#47), cursor never-fires (#48), cursor unknown-key (#49), codex no-commands-section (#50); all issues closed; 225 tests passing"
-    commits:
-      - !Object
-        sha: 65e5995
-        branch: main
-      - !Object
-        sha: d268a9f
-        branch: main
-      - !Object
-        sha: b1ff07d
-        branch: main
-      - !Object
-        sha: 12ace45
-        branch: main
+    commits: []
     session: 4
   - date: null
     summary: done=3 running=0 pending=1 blocked=0
