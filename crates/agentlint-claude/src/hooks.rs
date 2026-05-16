@@ -138,7 +138,7 @@ fn check_naive_str_match(path: &Path, src: &str, diags: &mut Vec<Diagnostic>) {
             path,
             line,
             1,
-            &format!(
+            format!(
                 "hook matches on raw stdin with {} without parsing JSON first; \
                  use `from json` / `jq` to extract specific fields before matching",
                 label
