@@ -1,0 +1,10 @@
+branch: main
+build: passing
+tests: "225/225"
+notes: "v0.4.0 tagged and pushed; all P3 backlog items shipped"
+touched_files:
+  - Cargo.lock
+  - Cargo.toml
+  - crates/agentlint-claude/src/settings.rs
+  - crates/agentlint-codex/src/lib.rs
+  - crates/agentlint-cursor/src/lib.rs

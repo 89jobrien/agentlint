@@ -374,9 +374,9 @@ fn check_allow_entry(path: &Path, entry: &str, diags: &mut Vec<Diagnostic>) {
                 path,
                 1,
                 1,
-                "permissions.allow contains an unconstrained Bash allow (`Bash(*)`); \
-                 this grants unrestricted shell execution — specify command patterns instead \
-                 (e.g. `Bash(git *:*)`)",
+                "permissions.allow contains an unconstrained Bash allow (bare `Bash` or \
+                 `Bash(*)`); this grants unrestricted shell execution — specify command \
+                 patterns instead (e.g. `Bash(git *:*)`)",
             )
             .with_rule("claude/settings/broad-bash-allow", Difficulty::Hard),
         );

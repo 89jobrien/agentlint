@@ -36,7 +36,12 @@ impl Validator for CodexValidator {
                 &["build", "test", "run", "lint", "commands", "setup"];
             let has_command_heading = src.lines().filter(|l| l.starts_with('#')).any(|l| {
                 let lower = l.to_lowercase();
-                COMMAND_KEYWORDS.iter().any(|kw| lower.contains(kw))
+                // Split into words to avoid substring false-positives (e.g. "runner", "runtime").
+                let words: Vec<&str> = lower
+                    .split(|c: char| !c.is_alphanumeric())
+                    .filter(|w| !w.is_empty())
+                    .collect();
+                COMMAND_KEYWORDS.iter().any(|kw| words.contains(kw))
             });
             if !has_command_heading {
                 diags.push(
@@ -154,6 +159,23 @@ mod tests {
         assert!(
             cmd_diags.is_empty(),
             "should not fire without headings: {cmd_diags:?}"
+        );
+    }
+
+    #[test]
+    fn no_commands_section_and_too_sparse_both_fire() {
+        let v = CodexValidator;
+        // Has a heading, no command heading, AND too sparse — both rules should fire.
+        let src = "# Overview\n\nSome text.\nMore text.";
+        let diags = v.validate(Path::new("AGENTS.md"), src);
+        let rules: Vec<_> = diags.iter().map(|d| d.rule).collect();
+        assert!(
+            rules.contains(&"codex/content/no-commands-section"),
+            "expected no-commands-section, got: {rules:?}"
+        );
+        assert!(
+            rules.contains(&"codex/content/too-sparse"),
+            "expected too-sparse, got: {rules:?}"
         );
     }
 

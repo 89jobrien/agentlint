@@ -75,7 +75,7 @@ impl Validator for CursorValidator {
             let always_apply = fields
                 .iter()
                 .find(|f| f.key == "alwaysApply")
-                .map(|f| f.value.trim() == "true")
+                .map(|f| f.value.trim().eq_ignore_ascii_case("true"))
                 .unwrap_or(false);
             let has_globs = fields
                 .iter()
