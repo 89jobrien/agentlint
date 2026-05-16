@@ -117,6 +117,57 @@ impl SettingsValidator {
             );
         }
 
+        // model key — validate against known Claude model IDs.
+        const KNOWN_MODELS: &[&str] = &[
+            "claude-opus-4-6",
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5-20251001",
+            "claude-3-5-sonnet-20241022",
+            "claude-3-5-haiku-20241022",
+            "claude-3-opus-20240229",
+            "claude-3-sonnet-20240229",
+            "claude-3-haiku-20240307",
+        ];
+        if let Some(model) = obj.get("model").and_then(|v| v.as_str())
+            && !KNOWN_MODELS.contains(&model)
+        {
+            diags.push(
+                Diagnostic::warning(
+                    path,
+                    1,
+                    1,
+                    format!(
+                        "model '{model}' is not a known Claude model ID; \
+                         check for typos or update agentlint's known-models list"
+                    ),
+                )
+                .with_rule("claude/settings/unknown-model", Difficulty::Hard),
+            );
+        }
+
+        // Top-level env block — warn on any op:// URIs.
+        if let Some(env) = obj.get("env").and_then(|v| v.as_object()) {
+            for (key, val) in env {
+                if let Some(s) = val.as_str()
+                    && s.starts_with("op://")
+                {
+                    diags.push(
+                        Diagnostic::warning(
+                            path,
+                            1,
+                            1,
+                            format!(
+                                "env.{key}: op:// URI will not resolve in Claude's shell \
+                                 context; use 'apiKeyHelper' or pre-resolve the secret \
+                                 before launch"
+                            ),
+                        )
+                        .with_rule("claude/settings/env-unresolved-op-ref", Difficulty::Hard),
+                    );
+                }
+            }
+        }
+
         // permissions.allow / permissions.deny must be arrays of strings.
         if let Some(perms) = obj.get("permissions").and_then(|v| v.as_object()) {
             for &field in &["allow", "deny"] {
@@ -621,6 +672,43 @@ mod tests {
             diags.iter().any(|d| d.message.contains("op://")),
             "expected op:// warning in settings mcpServers, got: {diags:?}"
         );
+    }
+
+    #[test]
+    fn unknown_model_is_warning() {
+        let src = r#"{"model": "gpt-4o"}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags.iter().any(|d| d.message.contains("gpt-4o")
+                && d.rule == "claude/settings/unknown-model"
+                && d.severity == agentlint_core::Severity::Warning),
+            "expected unknown-model warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn known_model_is_clean() {
+        let src = r#"{"model": "claude-sonnet-4-6"}"#;
+        assert_clean(&SettingsValidator::validate(Path::new(PATH), src));
+    }
+
+    #[test]
+    fn top_level_env_op_uri_is_warning() {
+        let src = r#"{"env": {"API_KEY": "op://Personal/item/field"}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/env-unresolved-op-ref"
+                    && d.severity == agentlint_core::Severity::Warning),
+            "expected env-unresolved-op-ref warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn top_level_env_regular_value_is_clean() {
+        let src = r#"{"env": {"LOG_LEVEL": "debug"}}"#;
+        assert_clean(&SettingsValidator::validate(Path::new(PATH), src));
     }
 
     #[test]
