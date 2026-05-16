@@ -1,5 +1,6 @@
 use agentlint_core::{Diagnostic, Difficulty};
 use agentlint_frontmatter::{FieldRule, FrontmatterValidator, parse};
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::OnceLock;
 
@@ -80,6 +81,49 @@ impl AgentsValidator {
 
         diags
     }
+}
+
+/// Cross-file duplicate-name check. Given a slice of `(path, src)` pairs for
+/// agent files, returns a `claude/agents/duplicate-name` warning for every
+/// file whose `name:` frontmatter value appears in more than one file.
+pub fn check_duplicate_names<'a>(files: &[(&'a Path, &'a str)]) -> Vec<Diagnostic> {
+    // Collect name → vec of (path, line) from each file that has a parseable name.
+    let mut name_to_files: HashMap<String, Vec<(&Path, usize)>> = HashMap::new();
+
+    for (path, src) in files {
+        if let Ok(fields) = parse(src) {
+            for field in &fields {
+                if field.key == "name" && !field.value.is_empty() {
+                    name_to_files
+                        .entry(field.value.clone())
+                        .or_default()
+                        .push((path, field.line));
+                    break; // only the first `name:` field matters
+                }
+            }
+        }
+    }
+
+    let mut diags = Vec::new();
+    for (name, occurrences) in &name_to_files {
+        if occurrences.len() > 1 {
+            for (path, line) in occurrences {
+                diags.push(
+                    Diagnostic::warning(
+                        *path,
+                        *line,
+                        1,
+                        format!(
+                            "agent name '{name}' is defined in multiple files; \
+                             the last loaded definition silently shadows the others"
+                        ),
+                    )
+                    .with_rule("claude/agents/duplicate-name", Difficulty::Hard),
+                );
+            }
+        }
+    }
+    diags
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +255,52 @@ mod tests {
                 .iter()
                 .all(|d| d.rule != "claude/agents/name-collision"),
             "non-builtin name should not trigger name-collision"
+        );
+    }
+
+    // ---- #35: duplicate-name ----
+
+    #[test]
+    fn duplicate_agent_names_emit_warnings() {
+        let src_a = "---\nname: my-agent\ndescription: a long enough description here\n---\n";
+        let src_b = "---\nname: my-agent\ndescription: another long enough description\n---\n";
+        let files = vec![
+            (Path::new(".claude/agents/a.md"), src_a),
+            (Path::new(".claude/agents/b.md"), src_b),
+        ];
+        let diags = check_duplicate_names(&files);
+        assert_eq!(
+            diags
+                .iter()
+                .filter(|d| d.rule == "claude/agents/duplicate-name")
+                .count(),
+            2,
+            "expected one warning per file with a duplicate name"
+        );
+        assert!(
+            diags.iter().all(|d| d.severity == Severity::Warning),
+            "duplicate-name should be a warning"
+        );
+        assert!(
+            diags.iter().all(|d| d.difficulty == Difficulty::Hard),
+            "duplicate-name should be Difficulty::Hard"
+        );
+    }
+
+    #[test]
+    fn distinct_agent_names_no_duplicate_warning() {
+        let src_a = "---\nname: agent-one\ndescription: a long enough description here\n---\n";
+        let src_b = "---\nname: agent-two\ndescription: another long enough description\n---\n";
+        let files = vec![
+            (Path::new(".claude/agents/a.md"), src_a),
+            (Path::new(".claude/agents/b.md"), src_b),
+        ];
+        let diags = check_duplicate_names(&files);
+        assert!(
+            diags
+                .iter()
+                .all(|d| d.rule != "claude/agents/duplicate-name"),
+            "distinct names should produce no duplicate-name warnings"
         );
     }
 

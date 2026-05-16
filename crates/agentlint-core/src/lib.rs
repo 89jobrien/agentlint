@@ -219,6 +219,14 @@ pub trait Validator: Send + Sync {
 
     /// Validate `src` (the file contents) for `path`. Returns all diagnostics.
     fn validate(&self, path: &Path, src: &str) -> Vec<Diagnostic>;
+
+    /// Cross-file validation called once after all per-file passes. Receives
+    /// only the files claimed by this validator. Default implementation returns
+    /// no diagnostics; override for rules that require global state (e.g.
+    /// duplicate-name detection).
+    fn validate_batch(&self, _files: &[(PathBuf, String)]) -> Vec<Diagnostic> {
+        vec![]
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -254,15 +262,36 @@ pub fn run_on(
     let mut diagnostics = Vec::new();
     let mut files_checked = 0;
 
-    for (path, src) in files {
-        let matched = find_validators(&path, validators);
+    // Collect all files first so we can run cross-file batch checks after.
+    let all_files: Vec<(PathBuf, String)> = files.into_iter().collect();
+
+    for (path, src) in &all_files {
+        let matched = find_validators(path, validators);
         if matched.is_empty() {
             continue;
         }
         files_checked += 1;
         for validator in matched {
-            diagnostics.extend(validator.validate(&path, &src));
+            diagnostics.extend(validator.validate(path, src));
         }
+    }
+
+    // Cross-file batch checks: pass each validator the subset of files it claims.
+    for validator in validators {
+        let claimed: Vec<(PathBuf, String)> = all_files
+            .iter()
+            .filter(|(path, _)| {
+                !find_validators(path, validators).is_empty()
+                    && find_validators(path, validators).iter().any(|v| {
+                        std::ptr::eq(
+                            *v as *const dyn Validator,
+                            validator.as_ref() as *const dyn Validator,
+                        )
+                    })
+            })
+            .cloned()
+            .collect();
+        diagnostics.extend(validator.validate_batch(&claimed));
     }
 
     // 1. Difficulty filter — unclassified diagnostics (rule="") always show.
