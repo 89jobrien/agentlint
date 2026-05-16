@@ -1,5 +1,12 @@
 # agentlint roadmap
 
+**Status**: active
+**Author**: Joseph O'Brien
+**Created**: 2026-05-16
+**Updated**: 2026-05-16
+
+---
+
 Tracks shipped milestones and planned work. Issues are on GitHub; this file captures the
 high-level narrative.
 
@@ -104,10 +111,32 @@ These are identified gaps not yet assigned issues:
 
 ## Quality metrics
 
-| Version | Tests | `cargo qual` score | Findings |
-| ------- | ----- | ------------------ | -------- |
-| v0.5.0  | 257   | 87.2%              | 38       |
-| target  | —     | ≥ 95%              | ≤ 10     |
+`cargo qual` was first run at v0.5.0. Earlier versions show test counts only.
+
+| Version | Tests | `cargo qual` score | Findings | Notes                                |
+| ------- | ----: | -----------------: | -------: | ------------------------------------ |
+| v0.1.0  |     — |                  — |        — | foundation; no test suite yet        |
+| v0.2.0  |     — |                  — |        — | false-positive reduction pass        |
+| v0.3.0  |     — |                  — |        — | codex + opencode + mcp added         |
+| v0.4.0  |   225 |                  — |        — | settings + cursor depth              |
+| v0.4.1  |   228 |                  — |        — | sentinel review fixes                |
+| v0.5.0  |   257 |              87.2% |       38 | gemini/pi/opencode structural parity |
+| target  |     — |              ≥ 95% |     ≤ 10 | after #54–#63 land                   |
+
+### Findings breakdown (v0.5.0)
+
+| Category                           |  Count | Issues                        |
+| ---------------------------------- | -----: | ----------------------------- |
+| IOSP violations                    |      8 | [#58]                         |
+| Dead code (cross-crate public API) |      9 | [#55]                         |
+| Long functions                     |      6 | [#59] [#60] [#61] [#62] [#63] |
+| Magic numbers                      |      6 | [#54]                         |
+| Complexity (cyclomatic/cognitive)  |      2 | [#59] [#60]                   |
+| SRP module                         |      2 | [#59] [#63]                   |
+| Boilerplate                        |      2 | [#55] [#56]                   |
+| Fragments                          |      2 | [#59] [#60]                   |
+| Error handling                     |      1 | [#57]                         |
+| **Total**                          | **38** |                               |
 
 [#54]: https://github.com/89jobrien/agentlint/issues/54
 [#55]: https://github.com/89jobrien/agentlint/issues/55
