@@ -1,0 +1,147 @@
+# agentlint.example.toml — reference configuration for agentlint
+#
+# Copy this file to .agentlint.toml at your repo root and edit as needed.
+# All sections are optional. Defaults are noted inline.
+#
+# Docs: https://github.com/89jobrien/agentlint
+
+# ---------------------------------------------------------------------------
+# [agentlint] — global settings
+# ---------------------------------------------------------------------------
+
+[agentlint]
+
+# Difficulty controls which rules fire.
+#
+#   easy    — definite breakage only: invalid JSON, missing shebang, empty
+#              files, credential exposure in allow lists
+#   hard    — breakage + operational problems: expensive hooks, dangerous
+#              settings, missing required fields, CI workflow allow entries
+#   painful — everything: broad Read() permissions, stale allows, naive
+#              pattern matching in hook scripts, best-practice style
+#
+# Default: hard
+# Override at runtime: agentlint --difficulty easy
+difficulty = "hard"
+
+# ---------------------------------------------------------------------------
+# [rules] — per-rule severity overrides
+#
+# Keys are rule IDs in <validator>/<category>/<slug> form.
+# Values are one of:
+#   "error"   — always emit as error regardless of native severity; breaks
+#                pipelines that exit on error (e.g. CI, pre-commit gates)
+#   "warning" — always emit as warning regardless of native severity; logged
+#                but does not block pipelines
+#   "off"     — suppress entirely; rule is never reported
+#
+# Overrides are applied after difficulty filtering: a rule suppressed by
+# difficulty never reaches this step.
+# ---------------------------------------------------------------------------
+
+[rules]
+
+# --- claude/settings ---
+
+# Invalid or unparseable settings.json. Always easy — keep as error.
+# "claude/settings/invalid-json" = "error"
+
+# Unknown top-level key in settings.json. Hard by default.
+# Useful to silence during migrations to new Claude Code versions that add
+# keys agentlint doesn't know about yet.
+# "claude/settings/unknown-key" = "off"
+
+# skipDangerousModePermissionPrompt = true. Hard by default.
+# Some teams intentionally set this for fully automated pipelines.
+# "claude/settings/skip-dangerous-mode" = "off"
+
+# Hardcoded sshpass -p credential in permissions.allow. Easy by default.
+# Should almost never be silenced. Promote to error for stricter enforcement.
+# "claude/settings/sshpass-credential" = "error"
+
+# sleep in a permissions.allow Bash entry. Easy by default.
+# "claude/settings/sleep-in-allow" = "error"
+
+# .github/workflows path baked into permissions.allow. Hard by default.
+# Teams that intentionally allow CI modifications can silence this.
+# "claude/settings/ci-workflow-in-allow" = "off"
+
+# Broad Read() permission (≤3 path components). Painful by default.
+# Promote to hard-visible by raising difficulty, or demote to warning here.
+# "claude/settings/broad-read" = "warning"
+
+# Expensive interpreter in hook command (cargo, python, node). Hard by default.
+# "claude/settings/expensive-hook-command" = "warning"
+
+# sleep in a hook command. Easy by default.
+# "claude/settings/sleep-in-hook" = "error"
+
+# More than 7 hooks per matcher. Hard by default.
+# Raise to error if you want to enforce the limit strictly in CI.
+# "claude/settings/too-many-hooks" = "error"
+
+# hooks entry missing the inner 'hooks' array. Easy by default.
+# "claude/settings/hook-missing-hooks-array" = "error"
+
+# Individual hook missing 'command' field. Easy by default.
+# "claude/settings/hook-missing-command" = "error"
+
+# permissions.allow or permissions.deny is not an array of strings.
+# "claude/settings/invalid-permissions" = "error"
+
+# --- claude/hooks ---
+
+# Hook script missing shebang (#!) on line 1. Easy by default.
+# "claude/hooks/missing-shebang" = "error"
+
+# Hook script missing execute bit (chmod +x). Easy by default.
+# "claude/hooks/no-execute-bit" = "error"
+
+# --- claude/skills ---
+
+# SKILL.md missing frontmatter, name, or description. Easy by default.
+# "claude/skills/missing-frontmatter" = "error"
+# "claude/skills/missing-name"        = "error"
+# "claude/skills/missing-description" = "error"
+
+# --- gemini / pi / codex / opencode ---
+
+# Empty content files. Easy by default.
+# "gemini/content/empty"          = "error"
+# "pi/content/empty"              = "error"
+# "codex/content/empty"           = "error"
+# "opencode/content/empty"        = "error"
+# "opencode/config/invalid-json"  = "error"
+
+# --- cursor ---
+
+# Unclosed frontmatter fence in a Cursor rule file. Easy by default.
+# "cursor/frontmatter/unclosed-fence" = "error"
+
+# ---------------------------------------------------------------------------
+# [[ignore]] — suppress rules for specific files
+#
+# Each entry matches diagnostics whose file path ends with `path` (suffix
+# match; no glob expansion). An empty `rules` list suppresses all rules for
+# that path. Multiple [[ignore]] blocks are allowed.
+#
+# Use cases:
+#   - Local settings files that intentionally deviate from team standards
+#   - Generated files that should not be linted
+#   - Checked-in fixture files used by tests
+# ---------------------------------------------------------------------------
+
+# Example: silence broad-read warnings in a personal local settings override.
+# [[ignore]]
+# path  = ".claude/settings.local.json"
+# rules = ["claude/settings/broad-read"]
+
+# Example: silence all rules for a test fixture.
+# [[ignore]]
+# path  = "crates/agentlint-claude/tests/fixtures/settings/broad_read.json"
+# rules = []   # empty = suppress everything for this path
+
+# Example: allow skip-dangerous-mode in a fully automated pipeline config.
+# [[ignore]]
+# path  = ".claude/settings.automation.json"
+# rules = ["claude/settings/skip-dangerous-mode", "claude/settings/too-many-hooks"]
