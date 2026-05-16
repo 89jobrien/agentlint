@@ -346,37 +346,6 @@ fn extract_ref_prefix(s: &str) -> &str {
     ""
 }
 
-/// Strip a leading date or ticket-number ref before the topic.
-///
-/// Handles:
-/// - `YYYY-MM-DD-{topic}` — 10-char ISO date prefix
-/// - `YYYYMMDD-{topic}` — 8-digit compact date prefix
-/// - `{digits}-{topic}` — ticket number prefix
-fn strip_ref(s: &str) -> &str {
-    // Check for YYYY-MM-DD- prefix (11 chars: 10-char date + hyphen).
-    if s.len() > 11 {
-        let candidate = &s[..10];
-        let parts: Vec<&str> = candidate.split('-').collect();
-        if parts.len() == 3
-            && parts[0].len() == 4
-            && parts[1].len() == 2
-            && parts[2].len() == 2
-            && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit()))
-            && s.as_bytes().get(10) == Some(&b'-')
-        {
-            return &s[11..];
-        }
-    }
-    // Fall back: all-digit prefix before the first hyphen (YYYYMMDD or ticket number).
-    if let Some(pos) = s.find('-') {
-        let prefix = &s[..pos];
-        if !prefix.is_empty() && prefix.chars().all(|c| c.is_ascii_digit()) {
-            return &s[pos + 1..];
-        }
-    }
-    s
-}
-
 // ---------------------------------------------------------------------------
 // Date validation
 // ---------------------------------------------------------------------------
