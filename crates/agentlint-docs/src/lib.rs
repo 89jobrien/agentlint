@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 pub mod plugin;
+pub mod registry;
+
+pub use registry::SchemaRegistry;
 
 use plugin::BUILTIN_SRC;
 
