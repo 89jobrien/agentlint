@@ -1,6 +1,6 @@
 [package]
 name = "agentlint-gemini"
-version.workspace = true
+version = "0.2.0"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -9,4 +9,4 @@ publish.workspace = true
 description = "agentlint validator for Google Gemini GEMINI.md files"
 
 [dependencies]
-agentlint-core = { path = "../agentlint-core", version = "0.2.0" }
+agentlint-core = { workspace = true }

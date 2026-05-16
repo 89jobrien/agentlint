@@ -1,6 +1,6 @@
 [package]
 name = "agentlint-opencode"
-version.workspace = true
+version = "0.2.0"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -9,5 +9,5 @@ publish.workspace = true
 description = "agentlint validator for OpenCode AGENTS.md and opencode.json files"
 
 [dependencies]
-agentlint-core = { path = "../agentlint-core", version = "0.2.0" }
+agentlint-core = { workspace = true }
 serde_json     = "1"

@@ -20,6 +20,16 @@ authors = ["Joseph O'Brien"]
 repository = "https://github.com/89jobrien/agentlint"
 publish = true
 
+[workspace.dependencies]
+agentlint-core        = { path = "crates/agentlint-core",        version = "0.2.0" }
+agentlint-frontmatter = { path = "crates/agentlint-frontmatter", version = "0.2.0" }
+agentlint-claude      = { path = "crates/agentlint-claude",      version = "0.2.0" }
+agentlint-cursor      = { path = "crates/agentlint-cursor",      version = "0.2.0" }
+agentlint-codex       = { path = "crates/agentlint-codex",       version = "0.2.0" }
+agentlint-opencode    = { path = "crates/agentlint-opencode",    version = "0.2.0" }
+agentlint-gemini      = { path = "crates/agentlint-gemini",      version = "0.2.0" }
+agentlint-pi          = { path = "crates/agentlint-pi",          version = "0.2.0" }
+
 [package]
 name = "agentlint"
 version.workspace = true
@@ -35,11 +45,11 @@ name = "agentlint"
 path = "src/main.rs"
 
 [dependencies]
-agentlint-core     = { path = "crates/agentlint-core",     version = "0.2.0", features = ["config"] }
-agentlint-claude   = { path = "crates/agentlint-claude",   version = "0.2.0" }
-agentlint-cursor   = { path = "crates/agentlint-cursor",   version = "0.2.0" }
-agentlint-codex    = { path = "crates/agentlint-codex",    version = "0.2.0" }
-agentlint-opencode = { path = "crates/agentlint-opencode", version = "0.2.0" }
-agentlint-gemini   = { path = "crates/agentlint-gemini",   version = "0.2.0" }
-agentlint-pi       = { path = "crates/agentlint-pi",       version = "0.2.0" }
+agentlint-core     = { workspace = true, features = ["config"] }
+agentlint-claude   = { workspace = true }
+agentlint-cursor   = { workspace = true }
+agentlint-codex    = { workspace = true }
+agentlint-opencode = { workspace = true }
+agentlint-gemini   = { workspace = true }
+agentlint-pi       = { workspace = true }
 clap               = { version = "4", features = ["derive"] }
