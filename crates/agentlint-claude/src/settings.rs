@@ -119,6 +119,7 @@ impl SettingsValidator {
 
         // model key — validate against known Claude model IDs.
         const KNOWN_MODELS: &[&str] = &[
+            // Full model IDs
             "claude-opus-4-6",
             "claude-sonnet-4-6",
             "claude-haiku-4-5-20251001",
@@ -127,6 +128,10 @@ impl SettingsValidator {
             "claude-3-opus-20240229",
             "claude-3-sonnet-20240229",
             "claude-3-haiku-20240307",
+            // Short aliases accepted by Claude Code
+            "opus",
+            "sonnet",
+            "haiku",
         ];
         if let Some(model) = obj.get("model").and_then(|v| v.as_str())
             && !KNOWN_MODELS.contains(&model)
