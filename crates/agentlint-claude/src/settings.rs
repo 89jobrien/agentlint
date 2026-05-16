@@ -258,6 +258,16 @@ impl SettingsValidator {
             }
         }
 
+        // Deduplicate: for rules that fire per-entry (allow list, hook commands),
+        // only keep the first occurrence of each rule ID per file.
+        let mut seen = std::collections::HashSet::new();
+        diags.retain(|d| {
+            if d.rule.is_empty() {
+                return true;
+            }
+            seen.insert(d.rule)
+        });
+
         diags
     }
 }
