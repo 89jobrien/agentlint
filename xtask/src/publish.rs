@@ -20,8 +20,9 @@ use std::path::Path;
 use xshell::{Shell, cmd};
 
 /// Seconds to wait between each crate publish.
-/// crates.io allows ~1 new crate/minute; 90 s gives comfortable headroom.
-const STAGGER_SECS: u64 = 90;
+/// New crates are rate-limited to ~1/min; subsequent versions of existing crates
+/// are indexed much faster. 20 s is sufficient for known crates.
+const STAGGER_SECS: u64 = 20;
 
 /// Publish order — strictly sequential, each entry depends on all prior entries.
 const PUBLISH_ORDER: &[&str] = &[
@@ -41,6 +42,18 @@ const PUBLISH_ORDER: &[&str] = &[
 /// of an identical version, but errors on version conflict — we detect "already uploaded"
 /// in stderr and treat it as success).
 pub fn publish(sh: &Shell, root: &Path, from_crate: Option<&str>) -> Result<()> {
+    if std::env::var("CARGO_REGISTRY_TOKEN").is_err() {
+        anyhow::bail!(
+            "CARGO_REGISTRY_TOKEN is not set.\n\
+             Inject it via:\n\
+             \n\
+             CARGO_REGISTRY_TOKEN=$(op item get tok5hcvdvhows2kcgjfhrpohpa \\\n\
+               --account VOKIF3CQ7VHTLN3SXXAPBWLY3E --fields token --reveal) \\\n\
+               cargo xtask publish\n\
+             \n\
+             Or run `cargo login` once to store the token in ~/.cargo/credentials.toml"
+        );
+    }
     let total = PUBLISH_ORDER.len();
     let start = match from_crate {
         None => 0,
