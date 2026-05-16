@@ -50,6 +50,7 @@ impl HooksValidator {
         check_naive_str_match(path, src, &mut diags);
         check_no_exit_code(path, src, &mut diags);
         check_infinite_loop(path, src, &mut diags);
+        check_sleep_in_body(path, src, &mut diags);
 
         diags
     }
@@ -285,6 +286,38 @@ fn check_infinite_loop(path: &Path, src: &str, diags: &mut Vec<Diagnostic>) {
     );
 }
 
+// ---------------------------------------------------------------------------
+// sleep-in-body detector
+// ---------------------------------------------------------------------------
+
+/// Patterns that indicate a blocking sleep call in the hook body.
+const SLEEP_PATTERNS: &[&str] = &["sleep ", "Start-Sleep"];
+
+fn check_sleep_in_body(path: &Path, src: &str, diags: &mut Vec<Diagnostic>) {
+    for (lineno, line) in src.lines().enumerate() {
+        let trimmed = line.trim_start();
+        // Skip comment lines.
+        if trimmed.starts_with('#') || trimmed.starts_with("//") {
+            continue;
+        }
+        for pat in SLEEP_PATTERNS {
+            if line.contains(pat) {
+                diags.push(
+                    Diagnostic::error(
+                        path,
+                        lineno + 1,
+                        1,
+                        "hook body contains a `sleep` call; sleep blocks the agent for the \
+                         duration of every tool call the hook fires on — remove it",
+                    )
+                    .with_rule("claude/hooks/sleep-in-body", Difficulty::Easy),
+                );
+                return;
+            }
+        }
+    }
+}
+
 #[cfg(unix)]
 fn has_execute_bit(path: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
@@ -495,6 +528,57 @@ mod tests {
                    fi\n";
         let diags = loop_diags("/hooks/post-tool.sh", src);
         assert!(diags.is_empty(), "matches Edit not Bash — should be clean");
+    }
+
+    // --- sleep-in-body tests ---
+
+    fn sleep_diags(src: &str) -> Vec<Diagnostic> {
+        HooksValidator::validate(Path::new("/tmp/my-hook"), src)
+            .into_iter()
+            .filter(|d| d.rule == "claude/hooks/sleep-in-body")
+            .collect()
+    }
+
+    #[test]
+    fn sleep_in_body_bash_is_error() {
+        let src = "#!/usr/bin/env bash\nsleep 5\necho done\n";
+        let diags = sleep_diags(src);
+        assert!(!diags.is_empty(), "expected sleep-in-body error");
+        assert!(diags[0].message.contains("sleep"));
+    }
+
+    #[test]
+    fn sleep_in_body_nu_is_error() {
+        let src = "#!/usr/bin/env nu\nsleep 0.5sec\necho done\n";
+        let diags = sleep_diags(src);
+        assert!(
+            !diags.is_empty(),
+            "expected sleep-in-body error for nu sleep"
+        );
+    }
+
+    #[test]
+    fn sleep_in_body_powershell_is_error() {
+        let src = "#!/usr/bin/env pwsh\nStart-Sleep -Seconds 3\nWrite-Output done\n";
+        let diags = sleep_diags(src);
+        assert!(
+            !diags.is_empty(),
+            "expected sleep-in-body error for Start-Sleep"
+        );
+    }
+
+    #[test]
+    fn sleep_in_comment_is_clean() {
+        let src = "#!/usr/bin/env bash\n# sleep 5 was here but removed\necho done\n";
+        let diags = sleep_diags(src);
+        assert!(diags.is_empty(), "sleep in comment — should be clean");
+    }
+
+    #[test]
+    fn no_sleep_is_clean() {
+        let src = "#!/usr/bin/env bash\necho done\n";
+        let diags = sleep_diags(src);
+        assert!(diags.is_empty(), "no sleep — should be clean");
     }
 
     #[cfg(unix)]
