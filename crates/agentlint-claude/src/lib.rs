@@ -1,5 +1,5 @@
 use agentlint_core::{Diagnostic, Validator};
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 mod frontmatter;
 
@@ -99,5 +99,16 @@ impl Validator for ClaudeValidator {
             Some(ClaudeFileKind::Meta) => meta::MetaValidator::validate(path, src),
             None => vec![],
         }
+    }
+
+    fn validate_batch(&self, files: &[(PathBuf, String)]) -> Vec<Diagnostic> {
+        // Cross-file rule: detect duplicate agent `name:` values.
+        let agent_files: Vec<(&Path, &str)> = files
+            .iter()
+            .filter(|(path, _)| matches!(claude_file_kind(path), Some(ClaudeFileKind::Agent)))
+            .map(|(path, src)| (path.as_path(), src.as_str()))
+            .collect();
+
+        agents::check_duplicate_names(&agent_files)
     }
 }
