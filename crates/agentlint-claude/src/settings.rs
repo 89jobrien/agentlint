@@ -367,6 +367,21 @@ impl SettingsValidator {
 ///
 /// Entry format: `TOOL(SPEC)` e.g. `Bash(git add:*)`, `Read(//Users/joe/**)`.
 fn check_allow_entry(path: &Path, entry: &str, diags: &mut Vec<Diagnostic>) {
+    // Bare "Bash" or unconstrained "Bash(*)" / "Bash(*:..." grants unrestricted shell execution.
+    if entry == "Bash" || entry == "Bash(*)" || entry.starts_with("Bash(*:") {
+        diags.push(
+            Diagnostic::warning(
+                path,
+                1,
+                1,
+                "permissions.allow contains an unconstrained Bash allow (`Bash(*)`); \
+                 this grants unrestricted shell execution — specify command patterns instead \
+                 (e.g. `Bash(git *:*)`)",
+            )
+            .with_rule("claude/settings/broad-bash-allow", Difficulty::Hard),
+        );
+    }
+
     if entry.starts_with("Bash(") {
         // Hardcoded credentials via sshpass.
         if entry.contains("sshpass -p") {
@@ -467,7 +482,52 @@ mod tests {
 
     #[test]
     fn valid_settings_no_diagnostics() {
-        let src = r#"{"permissions": {"allow": ["Bash"], "deny": []}}"#;
+        let src = r#"{"permissions": {"allow": ["Bash(git *:*)"], "deny": []}}"#;
+        assert_clean(&SettingsValidator::validate(Path::new(PATH), src));
+    }
+
+    #[test]
+    fn allow_bare_bash_is_warning() {
+        let src = r#"{"permissions": {"allow": ["Bash"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/broad-bash-allow"
+                    && d.severity == agentlint_core::Severity::Warning),
+            "expected broad-bash-allow warning for bare Bash, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn allow_bash_star_is_warning() {
+        let src = r#"{"permissions": {"allow": ["Bash(*)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/broad-bash-allow"
+                    && d.severity == agentlint_core::Severity::Warning),
+            "expected broad-bash-allow warning for Bash(*), got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn allow_bash_star_colon_is_warning() {
+        let src = r#"{"permissions": {"allow": ["Bash(*:some-dir)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/broad-bash-allow"
+                    && d.severity == agentlint_core::Severity::Warning),
+            "expected broad-bash-allow warning for Bash(*:...), got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn allow_scoped_bash_is_clean() {
+        let src = r#"{"permissions": {"allow": ["Bash(git *:*)"]}}"#;
         assert_clean(&SettingsValidator::validate(Path::new(PATH), src));
     }
 
