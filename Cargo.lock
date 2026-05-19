@@ -12,8 +12,10 @@ dependencies = [
  "agentlint-cursor",
  "agentlint-docs",
  "agentlint-gemini",
+ "agentlint-looprs",
  "agentlint-opencode",
  "agentlint-pi",
+ "agentlint-plugins",
  "clap",
  "serde_json",
  "walkdir",
@@ -42,6 +44,7 @@ version = "0.5.0"
 dependencies = [
  "serde",
  "serde_json",
+ "serde_yaml",
  "tempfile",
  "toml",
  "walkdir",
@@ -85,6 +88,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "agentlint-looprs"
+version = "0.5.0"
+dependencies = [
+ "agentlint-core",
+ "agentlint-frontmatter",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+]
+
+[[package]]
 name = "agentlint-opencode"
 version = "0.5.0"
 dependencies = [
@@ -94,6 +108,13 @@ dependencies = [
 
 [[package]]
 name = "agentlint-pi"
+version = "0.5.0"
+dependencies = [
+ "agentlint-core",
+]
+
+[[package]]
+name = "agentlint-plugins"
 version = "0.5.0"
 dependencies = [
  "agentlint-core",

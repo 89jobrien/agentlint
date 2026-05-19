@@ -102,7 +102,8 @@ fn main() {
     );
     docs_validator.set_infer_mode(infer);
 
-    let validators: Vec<Box<dyn Validator>> = vec![
+    // Rust-native validators (behavioral rules not expressible declaratively).
+    let mut validators: Vec<Box<dyn Validator>> = vec![
         Box::new(agentlint_claude::ClaudeValidator),
         Box::new(agentlint_cursor::CursorValidator),
         Box::new(agentlint_codex::CodexValidator),
@@ -110,8 +111,26 @@ fn main() {
         Box::new(agentlint_opencode::OpenCodeJsonValidator),
         Box::new(agentlint_gemini::GeminiValidator),
         Box::new(agentlint_pi::PiValidator),
+        Box::new(agentlint_looprs::CommandsValidator),
+        Box::new(agentlint_looprs::HooksValidator),
+        Box::new(agentlint_looprs::SkillsValidator),
+        Box::new(agentlint_looprs::AgentsValidator),
+        Box::new(agentlint_looprs::RulesValidator),
+        Box::new(agentlint_looprs::ConfigValidator),
+        Box::new(agentlint_looprs::AgentJsonValidator),
         Box::new(docs_validator),
     ];
+
+    // Declarative validators from embedded plugin TOMLs.
+    validators.extend(agentlint_plugins::all_validators());
+
+    // External plugins from plugins/ directory (user-defined).
+    let (ext_validators, ext_errors) =
+        agentlint_plugins::load_external(std::path::Path::new("plugins"));
+    for e in ext_errors {
+        eprintln!("agentlint: {e}");
+    }
+    validators.extend(ext_validators);
 
     let result = run(&roots, &validators, &config);
     let has_errors = result
