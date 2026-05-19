@@ -217,6 +217,13 @@ impl DocsSchema {
     /// Returns `DocsSchema::default()` when the file is absent or has no
     /// `[docs]` section. Returns an error string when the file exists but
     /// cannot be parsed.
+    ///
+    /// Supports two schema resolution keys:
+    /// - `schema`: named schema resolved via `SchemaRegistry` (built-in or
+    ///   discovered from `.agentlint/schemas/`)
+    /// - `schema_file`: explicit path to a JSON schema file (takes precedence)
+    ///
+    /// Inline field overrides are applied on top of the resolved base schema.
     pub fn from_config_path(path: &Path) -> Result<Self, String> {
         let src = match std::fs::read_to_string(path) {
             Ok(s) => s,
@@ -227,13 +234,76 @@ impl DocsSchema {
         #[derive(Deserialize, Default)]
         struct RawFile {
             #[serde(default)]
-            docs: Option<DocsSchema>,
+            docs: Option<RawDocs>,
+        }
+
+        #[derive(Deserialize, Default)]
+        struct RawDocs {
+            #[serde(default)]
+            schema: Option<String>,
+            #[serde(default)]
+            schema_file: Option<String>,
+            #[serde(default)]
+            file_glob: Option<String>,
+            #[serde(default)]
+            required_fields: Option<Vec<String>>,
+            #[serde(default)]
+            doctypes: Option<Vec<String>>,
+            #[serde(default)]
+            statuses: Option<Vec<String>>,
+            #[serde(default)]
+            date_fields: Option<Vec<String>>,
+            #[serde(default)]
+            conventions: Option<Vec<FilenameConvention>>,
         }
 
         let raw: RawFile =
             toml::from_str(&src).map_err(|e| format!("invalid config {}: {e}", path.display()))?;
 
-        Ok(raw.docs.unwrap_or_default())
+        let Some(docs) = raw.docs else {
+            return Ok(Self::default());
+        };
+
+        // Resolve base schema.
+        let root = path.parent().unwrap_or(Path::new("."));
+        let registry = crate::registry::SchemaRegistry::discover(root);
+
+        let mut base = if let Some(ref file) = docs.schema_file {
+            let p = crate::plugin::FileJsonPlugin::new(root.join(file));
+            use crate::plugin::DocsSchemaPlugin;
+            p.load()?
+        } else if let Some(ref name) = docs.schema {
+            registry.get(name).ok_or_else(|| {
+                format!(
+                    "unknown schema '{name}'; available: {}",
+                    registry.names().join(", ")
+                )
+            })??
+        } else {
+            Self::default()
+        };
+
+        // Apply inline overrides — only explicitly-specified fields win.
+        if let Some(v) = docs.file_glob {
+            base.file_glob = v;
+        }
+        if let Some(v) = docs.required_fields {
+            base.required_fields = v;
+        }
+        if let Some(v) = docs.doctypes {
+            base.doctypes = v;
+        }
+        if let Some(v) = docs.statuses {
+            base.statuses = v;
+        }
+        if let Some(v) = docs.date_fields {
+            base.date_fields = v;
+        }
+        if let Some(v) = docs.conventions {
+            base.conventions = v;
+        }
+
+        Ok(base)
     }
 }
 
@@ -454,58 +524,58 @@ impl Validator for DocsValidator {
         }
 
         // Enum: status.
-        if let Some((status_val, line)) = get("status") {
-            if !schema.statuses.iter().any(|s| s == status_val) {
-                diags.push(
-                    Diagnostic::error(
-                        path,
-                        line,
-                        1,
-                        format!(
-                            "unknown status '{status_val}'; expected one of: {}",
-                            schema.statuses.join(", ")
-                        ),
-                    )
-                    .with_rule("docs/frontmatter/unknown-status", Difficulty::Easy),
-                );
-            }
+        if let Some((status_val, line)) = get("status")
+            && !schema.statuses.iter().any(|s| s == status_val)
+        {
+            diags.push(
+                Diagnostic::error(
+                    path,
+                    line,
+                    1,
+                    format!(
+                        "unknown status '{status_val}'; expected one of: {}",
+                        schema.statuses.join(", ")
+                    ),
+                )
+                .with_rule("docs/frontmatter/unknown-status", Difficulty::Easy),
+            );
         }
 
         // Enum: doctype.
-        if let Some((doctype_val, line)) = get("doctype") {
-            if !schema.doctypes.iter().any(|d| d == doctype_val) {
-                diags.push(
-                    Diagnostic::error(
-                        path,
-                        line,
-                        1,
-                        format!(
-                            "unknown doctype '{doctype_val}'; expected one of: {}",
-                            schema.doctypes.join(", ")
-                        ),
-                    )
-                    .with_rule("docs/frontmatter/unknown-doctype", Difficulty::Easy),
-                );
-            }
+        if let Some((doctype_val, line)) = get("doctype")
+            && !schema.doctypes.iter().any(|d| d == doctype_val)
+        {
+            diags.push(
+                Diagnostic::error(
+                    path,
+                    line,
+                    1,
+                    format!(
+                        "unknown doctype '{doctype_val}'; expected one of: {}",
+                        schema.doctypes.join(", ")
+                    ),
+                )
+                .with_rule("docs/frontmatter/unknown-doctype", Difficulty::Easy),
+            );
         }
 
         // Date fields.
         for date_key in &schema.date_fields {
-            if let Some((date_val, line)) = get(date_key) {
-                if !is_valid_date(date_val) {
-                    diags.push(
-                        Diagnostic::error(
-                            path,
-                            line,
-                            1,
-                            format!(
-                                "field '{date_key}' value '{date_val}' is not a valid \
-                                 YYYY-MM-DD date"
-                            ),
-                        )
-                        .with_rule("docs/frontmatter/invalid-date", Difficulty::Easy),
-                    );
-                }
+            if let Some((date_val, line)) = get(date_key)
+                && !is_valid_date(date_val)
+            {
+                diags.push(
+                    Diagnostic::error(
+                        path,
+                        line,
+                        1,
+                        format!(
+                            "field '{date_key}' value '{date_val}' is not a valid \
+                             YYYY-MM-DD date"
+                        ),
+                    )
+                    .with_rule("docs/frontmatter/invalid-date", Difficulty::Easy),
+                );
             }
         }
 
@@ -517,26 +587,25 @@ impl Validator for DocsValidator {
         if let Some((_conv, tokens)) = &convention_match {
             // Tokens that map 1:1 to frontmatter fields.
             for field_token in &["doctype", "project", "status"] {
-                if let Some(token_val) = tokens.get(*field_token) {
-                    if let Some((field_val, line)) = get(field_token) {
-                        if field_val != token_val {
-                            let rule_id: &'static str = Box::leak(
-                                format!("docs/frontmatter/{field_token}-mismatch").into_boxed_str(),
-                            );
-                            diags.push(
-                                Diagnostic::error(
-                                    path,
-                                    line,
-                                    1,
-                                    format!(
-                                        "{field_token} field '{field_val}' does not match \
-                                         filename-derived value '{token_val}'"
-                                    ),
-                                )
-                                .with_rule(rule_id, Difficulty::Easy),
-                            );
-                        }
-                    }
+                if let Some(token_val) = tokens.get(*field_token)
+                    && let Some((field_val, line)) = get(field_token)
+                    && field_val != token_val
+                {
+                    let rule_id: &'static str = Box::leak(
+                        format!("docs/frontmatter/{field_token}-mismatch").into_boxed_str(),
+                    );
+                    diags.push(
+                        Diagnostic::error(
+                            path,
+                            line,
+                            1,
+                            format!(
+                                "{field_token} field '{field_val}' does not match \
+                                 filename-derived value '{token_val}'"
+                            ),
+                        )
+                        .with_rule(rule_id, Difficulty::Easy),
+                    );
                 }
             }
 
@@ -549,21 +618,21 @@ impl Validator for DocsValidator {
             let title_dt = tokens.get("doctype").cloned();
             if let (Some(base), Some(dt)) = (title_base, title_dt) {
                 let expected_title = format!("{base}-{dt}");
-                if let Some((title_val, line)) = get("title") {
-                    if title_val != expected_title {
-                        diags.push(
-                            Diagnostic::error(
-                                path,
-                                line,
-                                1,
-                                format!(
-                                    "title '{title_val}' does not match filename-derived id \
-                                     '{expected_title}'"
-                                ),
-                            )
-                            .with_rule("docs/frontmatter/title-mismatch", Difficulty::Easy),
-                        );
-                    }
+                if let Some((title_val, line)) = get("title")
+                    && title_val != expected_title
+                {
+                    diags.push(
+                        Diagnostic::error(
+                            path,
+                            line,
+                            1,
+                            format!(
+                                "title '{title_val}' does not match filename-derived id \
+                                 '{expected_title}'"
+                            ),
+                        )
+                        .with_rule("docs/frontmatter/title-mismatch", Difficulty::Easy),
+                    );
                 }
             }
 
@@ -969,6 +1038,55 @@ mod tests {
                 .any(|d| d.rule.starts_with("docs/frontmatter/meta")),
             "valid YAML dict meta should produce no meta errors: {diags:?}"
         );
+    }
+
+    // --- from_config_path with schema name ---
+
+    #[test]
+    fn from_config_schema_name_resolves_builtin() {
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join(".agentlint.toml");
+        std::fs::write(&toml_path, "[docs]\nschema = \"agentlint-default\"\n").unwrap();
+        let schema = DocsSchema::from_config_path(&toml_path).unwrap();
+        assert!(!schema.doctypes.is_empty());
+    }
+
+    #[test]
+    fn from_config_schema_file_loads_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let schema_path = dir.path().join("custom.json");
+        std::fs::write(&schema_path, r#"{"doctypes": ["note"]}"#).unwrap();
+        let toml_path = dir.path().join(".agentlint.toml");
+        std::fs::write(
+            &toml_path,
+            format!("[docs]\nschema_file = \"custom.json\"\n"),
+        )
+        .unwrap();
+        let schema = DocsSchema::from_config_path(&toml_path).unwrap();
+        assert_eq!(schema.doctypes, vec!["note"]);
+    }
+
+    #[test]
+    fn from_config_inline_overrides_win() {
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join(".agentlint.toml");
+        std::fs::write(
+            &toml_path,
+            "[docs]\nschema = \"agentlint-default\"\ndoctypes = [\"custom\"]\n",
+        )
+        .unwrap();
+        let schema = DocsSchema::from_config_path(&toml_path).unwrap();
+        assert_eq!(schema.doctypes, vec!["custom"]);
+    }
+
+    #[test]
+    fn from_config_unknown_schema_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join(".agentlint.toml");
+        std::fs::write(&toml_path, "[docs]\nschema = \"nonexistent\"\n").unwrap();
+        let result = DocsSchema::from_config_path(&toml_path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("unknown schema"));
     }
 
     // --- custom schema via DocsSchema ---

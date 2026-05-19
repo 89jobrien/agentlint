@@ -29,6 +29,14 @@ struct Cli {
     /// Always exit 0 (audit mode)
     #[arg(long)]
     exit_zero: bool,
+
+    /// Infer docs schema from corpus and validate outliers against it
+    #[arg(long)]
+    infer_schema: bool,
+
+    /// Infer docs schema from corpus and print JSON to stdout (implies --infer-schema)
+    #[arg(long)]
+    emit_schema: bool,
 }
 
 fn main() {
@@ -70,6 +78,30 @@ fn main() {
         cli.paths
     };
 
+    let infer = cli.infer_schema || cli.emit_schema;
+
+    // Handle --emit-schema: collect docs files, infer schema, print JSON, exit.
+    if cli.emit_schema {
+        let mut docs_files = Vec::new();
+        for root in &roots {
+            collect_docs_files(root, &mut docs_files);
+        }
+        let corpus: Vec<(&std::path::Path, &str)> = docs_files
+            .iter()
+            .map(|(p, s)| (p.as_path(), s.as_str()))
+            .collect();
+        let inferred = agentlint_docs::infer_schema(&corpus);
+        let json = serde_json::to_string_pretty(&inferred).unwrap_or_else(|_| "{}".to_string());
+        println!("{json}");
+        return;
+    }
+
+    let mut docs_validator = agentlint_docs::DocsValidator::new(
+        agentlint_docs::DocsSchema::from_config_path(std::path::Path::new(".agentlint.toml"))
+            .unwrap_or_default(),
+    );
+    docs_validator.set_infer_mode(infer);
+
     let validators: Vec<Box<dyn Validator>> = vec![
         Box::new(agentlint_claude::ClaudeValidator),
         Box::new(agentlint_cursor::CursorValidator),
@@ -78,10 +110,7 @@ fn main() {
         Box::new(agentlint_opencode::OpenCodeJsonValidator),
         Box::new(agentlint_gemini::GeminiValidator),
         Box::new(agentlint_pi::PiValidator),
-        Box::new(agentlint_docs::DocsValidator::new(
-            agentlint_docs::DocsSchema::from_config_path(std::path::Path::new(".agentlint.toml"))
-                .unwrap_or_default(),
-        )),
+        Box::new(docs_validator),
     ];
 
     let result = run(&roots, &validators, &config);
@@ -123,5 +152,22 @@ fn main() {
 
     if has_errors && !cli.exit_zero {
         process::exit(1);
+    }
+}
+
+/// Walk `root` and collect all `docs/**/*.md` files (path + content).
+fn collect_docs_files(root: &std::path::Path, out: &mut Vec<(PathBuf, String)>) {
+    for entry in walkdir::WalkDir::new(root)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+    {
+        let path = entry.into_path();
+        let is_docs_md = path.components().any(|c| c.as_os_str() == "docs")
+            && path.extension().and_then(|e| e.to_str()) == Some("md");
+        if is_docs_md && let Ok(src) = std::fs::read_to_string(&path) {
+            out.push((path, src));
+        }
     }
 }

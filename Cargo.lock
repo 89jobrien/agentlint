@@ -15,6 +15,8 @@ dependencies = [
  "agentlint-opencode",
  "agentlint-pi",
  "clap",
+ "serde_json",
+ "walkdir",
 ]
 
 [[package]]

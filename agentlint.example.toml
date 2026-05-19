@@ -155,6 +155,13 @@ difficulty = "hard"
 
 # [docs]
 
+# Named schema — resolves from .agentlint/schemas/<name>.json or a built-in.
+# Default built-in: "agentlint-default"
+# schema = "agentlint-default"
+
+# Explicit JSON schema file path (overrides `schema`).
+# schema_file = ".agentlint/schemas/my-team-docs.json"
+
 # Glob pattern used to discover doc files.
 # Default: "docs/**/*.md"
 # file_glob = "docs/**/*.md"
