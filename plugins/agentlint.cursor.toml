@@ -1,0 +1,41 @@
+# Declarative plugin: Cursor agent harness validator
+# Covers frontmatter structural checks for .cursor/rules and .cursorrules.
+# Behavioral rules (glob validation, never-fires logic) remain in the Rust crate.
+
+[plugin]
+name = "cursor"
+prefix = "cursor"
+
+[plugin.constants]
+known_frontmatter_keys = ["description", "globs", "alwaysApply"]
+
+# --- Rules (.cursor/rules/**/*.mdc, .cursor/rules/**/*.md, .cursorrules) ---
+
+[[validator]]
+id = "rules"
+patterns = [".cursor/rules/**/*.mdc", ".cursor/rules/**/*.md", ".cursorrules"]
+format = "frontmatter"
+frontmatter_optional = true
+
+[[validator.rules]]
+id = "cursor/frontmatter/unclosed-fence"
+check = "frontmatter-closed"
+severity = "error"
+difficulty = "easy"
+message = "unclosed frontmatter fence: missing closing '---'"
+
+[[validator.rules]]
+id = "cursor/frontmatter/missing-description"
+check = "field-required"
+field = "description"
+severity = "warning"
+difficulty = "hard"
+message = "missing 'description' field: Cursor cannot surface or auto-apply this rule without a description"
+
+[[validator.rules]]
+id = "cursor/frontmatter/unknown-key"
+check = "known-keys"
+values = "$known_frontmatter_keys"
+severity = "warning"
+difficulty = "easy"
+message = "unknown frontmatter key; Cursor only recognises `description`, `globs`, and `alwaysApply`"

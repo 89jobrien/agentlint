@@ -1,0 +1,36 @@
+# Declarative plugin: Pi agent harness validator
+# Validates AGENTS.md and SYSTEM.md content quality for Pi.
+
+[plugin]
+name = "pi"
+prefix = "pi"
+
+# --- AGENTS.md / SYSTEM.md ---
+
+[[validator]]
+id = "content"
+patterns = ["AGENTS.md", "SYSTEM.md"]
+format = "markdown"
+
+[[validator.rules]]
+id = "pi/content/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "file is empty"
+
+[[validator.rules]]
+id = "pi/content/no-heading"
+check = "has-heading"
+severity = "warning"
+difficulty = "painful"
+message = "file has no markdown headings"
+
+[[validator.rules]]
+id = "pi/content/too-sparse"
+check = "min-content"
+min_lines = 5
+min_chars = 100
+severity = "warning"
+difficulty = "painful"
+message = "file is too sparse to provide meaningful guidance"

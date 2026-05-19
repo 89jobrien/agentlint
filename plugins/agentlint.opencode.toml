@@ -1,0 +1,71 @@
+# Declarative plugin: OpenCode agent harness validator
+# Validates AGENTS.md content quality and opencode.json config for OpenCode.
+
+[plugin]
+name = "opencode"
+prefix = "opencode"
+
+[plugin.constants]
+known_config_keys = [
+    "model", "provider", "providers", "mcpServers",
+    "theme", "keybinds", "disabled_providers", "autoshare",
+]
+
+# --- AGENTS.md ---
+
+[[validator]]
+id = "content"
+patterns = ["AGENTS.md"]
+format = "markdown"
+
+[[validator.rules]]
+id = "opencode/content/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "AGENTS.md is empty"
+
+[[validator.rules]]
+id = "opencode/content/no-heading"
+check = "has-heading"
+severity = "warning"
+difficulty = "painful"
+message = "AGENTS.md has no markdown headings"
+
+[[validator.rules]]
+id = "opencode/content/no-commands-section"
+check = "has-command-heading"
+severity = "warning"
+difficulty = "painful"
+message = "AGENTS.md has no build/test commands section; add a heading like `## Commands` or `## Build` so OpenCode knows how to run the project"
+
+[[validator.rules]]
+id = "opencode/content/too-sparse"
+check = "min-content"
+min_lines = 5
+min_chars = 100
+severity = "warning"
+difficulty = "painful"
+message = "AGENTS.md is too sparse to provide meaningful guidance"
+
+# --- opencode.json ---
+
+[[validator]]
+id = "config"
+patterns = ["opencode.json"]
+format = "json"
+
+[[validator.rules]]
+id = "opencode/config/invalid-json"
+check = "valid-parse"
+severity = "error"
+difficulty = "easy"
+message = "invalid JSON"
+
+[[validator.rules]]
+id = "opencode/config/unknown-key"
+check = "known-keys"
+values = "$known_config_keys"
+severity = "warning"
+difficulty = "hard"
+message = "unknown key in opencode.json; it will be silently ignored"

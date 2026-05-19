@@ -1,0 +1,43 @@
+# Declarative plugin: Gemini agent harness validator
+# Validates GEMINI.md content quality for Google Gemini CLI.
+
+[plugin]
+name = "gemini"
+prefix = "gemini"
+
+# --- GEMINI.md ---
+
+[[validator]]
+id = "content"
+patterns = ["GEMINI.md"]
+format = "markdown"
+
+[[validator.rules]]
+id = "gemini/content/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "GEMINI.md is empty"
+
+[[validator.rules]]
+id = "gemini/content/no-heading"
+check = "has-heading"
+severity = "warning"
+difficulty = "painful"
+message = "GEMINI.md has no markdown headings"
+
+[[validator.rules]]
+id = "gemini/content/no-commands-section"
+check = "has-command-heading"
+severity = "warning"
+difficulty = "painful"
+message = "GEMINI.md has no build/test commands section; add a heading like `## Commands` or `## Build` so Gemini knows how to run the project"
+
+[[validator.rules]]
+id = "gemini/content/too-sparse"
+check = "min-content"
+min_lines = 5
+min_chars = 100
+severity = "warning"
+difficulty = "painful"
+message = "GEMINI.md is too sparse to provide meaningful guidance"

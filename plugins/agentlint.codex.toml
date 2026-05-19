@@ -1,0 +1,43 @@
+# Declarative plugin: Codex agent harness validator
+# Validates AGENTS.md content quality for OpenAI Codex.
+
+[plugin]
+name = "codex"
+prefix = "codex"
+
+# --- AGENTS.md ---
+
+[[validator]]
+id = "content"
+patterns = ["AGENTS.md"]
+format = "markdown"
+
+[[validator.rules]]
+id = "codex/content/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "AGENTS.md is empty"
+
+[[validator.rules]]
+id = "codex/content/no-heading"
+check = "has-heading"
+severity = "warning"
+difficulty = "painful"
+message = "AGENTS.md has no markdown headings"
+
+[[validator.rules]]
+id = "codex/content/no-commands-section"
+check = "has-command-heading"
+severity = "warning"
+difficulty = "painful"
+message = "AGENTS.md has no build/test commands section; add a heading like `## Commands` or `## Build` so Codex knows how to run the project"
+
+[[validator.rules]]
+id = "codex/content/too-sparse"
+check = "min-content"
+min_lines = 5
+min_chars = 100
+severity = "warning"
+difficulty = "painful"
+message = "AGENTS.md is too sparse to provide meaningful guidance"
