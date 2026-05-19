@@ -654,8 +654,19 @@ impl Validator for DocsValidator {
         }
 
         // meta: if present, must be a non-empty YAML mapping.
+        //
+        // The frontmatter parser strips indentation from continuation lines,
+        // so YAML block scalar indicators (`|`, `>`) need special handling:
+        // strip the indicator and parse the remaining lines directly.
         if let Some(meta_field) = fields.iter().find(|f| f.key == "meta") {
             let v = meta_field.value.trim();
+            let v = if v.starts_with('|') || v.starts_with('>') {
+                v[1..]
+                    .trim_start_matches(['-', '+']) // strip chomping indicator
+                    .trim_start()
+            } else {
+                v
+            };
             if v.is_empty() {
                 diags.push(
                     Diagnostic::error(
@@ -1023,6 +1034,22 @@ mod tests {
                 .iter()
                 .any(|d| d.rule == "docs/frontmatter/meta-not-object"),
             "expected meta-not-object error: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn meta_block_scalar_is_valid() {
+        // YAML block scalar `|` — frontmatter parser strips indentation,
+        // so the value arrives as "|\nauthor: Joe\nversion: 0.1.0".
+        let src = "---\ntitle: agentlint-roadmap\ndoctype: roadmap\nproject: agentlint\n\
+                   status: active\ncreated: 2026-05-16\nupdated: 2026-05-16\nmeta: |\n  \
+                   author: Joe\n  version: 0.1.0\n---\n";
+        let diags = v().validate(Path::new("docs/roadmap.agentlint.md"), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule.starts_with("docs/frontmatter/meta")),
+            "block scalar meta should produce no meta errors: {diags:?}"
         );
     }
 
