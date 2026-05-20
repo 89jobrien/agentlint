@@ -16,3 +16,4 @@
 .ctx/.initialized
 # handoff-end
 .worktrees/
+docs/.DS_Store

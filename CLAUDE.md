@@ -20,15 +20,22 @@ Cargo workspace with a thin binary entry point and one library crate per agent p
 
 ```
 agentlint/
-  src/main.rs              # thin CLI wrapper — arg parsing, calls core runner
+  src/main.rs                # thin CLI wrapper — arg parsing, calls core runner
   crates/
-    agentlint-core/        # Diagnostic type, Validator trait, file discovery, output formatters, runner
-    agentlint-claude/      # Claude Code: agents, skills, commands, hooks, settings
-    agentlint-cursor/      # Cursor: .cursor/rules/**/*.mdc|.md, .cursorrules
-    agentlint-codex/       # Codex: AGENTS.md
-    agentlint-opencode/    # OpenCode: AGENTS.md, opencode.json
-    agentlint-gemini/      # Gemini: GEMINI.md
-    agentlint-pi/          # Pi: AGENTS.md, SYSTEM.md
+    agentlint-core/          # Diagnostic type, Validator trait, discovery, formatters,
+                             #   runner, declarative plugin engine
+    agentlint-frontmatter/   # Shared YAML frontmatter parser (nom-based)
+    agentlint-claude/        # Claude Code: agents, skills, commands, hooks, settings
+    agentlint-cursor/        # Cursor: .cursor/rules/**/*.mdc|.md, .cursorrules
+    agentlint-codex/         # Codex: AGENTS.md
+    agentlint-opencode/      # OpenCode: AGENTS.md, opencode.json
+    agentlint-gemini/        # Gemini: GEMINI.md
+    agentlint-pi/            # Pi: AGENTS.md, SYSTEM.md
+    agentlint-looprs/        # Looprs: commands, hooks, skills YAML validation
+    agentlint-docs/          # Docs: frontmatter schema validation, --infer-schema,
+                             #   --emit-schema, SchemaRegistry
+    agentlint-plugins/       # Embedded declarative TOML plugin definitions
+  plugins/                   # TOML plugin files (compiled into the binary)
 ```
 
 ### Core abstractions (`agentlint-core`)
@@ -41,12 +48,13 @@ agentlint/
   diagnostics
 - Output: GNU format (`path:line:col: error: msg`) or JSON via `--format json`
 
-### Frontmatter parser
+### Frontmatter parser (`agentlint-frontmatter`)
 
-Claude Code and Cursor files use a `nom`-based frontmatter parser shared across those crates.
+Extracted into its own crate. Used by Claude Code, Cursor, and Docs validators.
 Grammar: `"---" newline field* "---" newline body`. Produces
-`Vec<Field { key, value, line }>`. Validation is a separate layer on top of the parse output so
-line numbers in diagnostics are accurate.
+`Vec<Field { key, value, line }>`. Includes a `FrontmatterValidator` builder for
+declarative required-field rules. Validation is a separate layer on top of the parse
+output so line numbers in diagnostics are accurate.
 
 ### Per-agent crate structure
 
@@ -70,6 +78,8 @@ known top-level keys.
 | `nom`        | Frontmatter parser (Claude Code, Cursor) |
 | `clap`       | CLI arg parsing (derive feature)         |
 | `serde_json` | JSON parsing for settings / opencode     |
+| `serde`      | Serialization for schemas and plugins    |
+| `toml`       | Declarative plugin definitions           |
 
 ## Exit codes
 

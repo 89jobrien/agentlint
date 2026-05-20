@@ -22,6 +22,7 @@ $ agentlint
 | OpenCode    | `AGENTS.md`, `opencode.json`                                                                                                                          |
 | Gemini      | `GEMINI.md`                                                                                                                                           |
 | Pi          | `AGENTS.md`, `SYSTEM.md`                                                                                                                              |
+| Looprs      | `.looprs/commands/*.yaml`, `.looprs/hooks/*.yaml`, `.looprs/skills/*.yaml`                                                                            |
 | Docs        | `docs/**/*.md` (frontmatter schema)                                                                                                                   |
 
 ## Install
@@ -108,6 +109,16 @@ agentlint --exit-zero
 - File is non-empty and not whitespace-only
 - `opencode.json` is valid JSON
 
+### Looprs
+
+**Commands, hooks, skills** (`.looprs/commands/`, `.looprs/hooks/`, `.looprs/skills/`):
+
+- Valid YAML
+- `name` field present and non-empty
+- `description` field present and non-empty
+- Hooks: `trigger` must be a known event (e.g. `SessionStart`, `PreToolUse`,
+  `PostToolUse`)
+
 ### Docs (`docs/**/*.md`)
 
 Files without a frontmatter fence are skipped. Files with frontmatter are validated against
@@ -160,6 +171,30 @@ Or with cargo:
 - uses: dtolnay/rust-toolchain@stable
 - run: cargo install agentlint
 - run: agentlint
+```
+
+## Architecture
+
+Cargo workspace with a thin binary entry point and one library crate per platform:
+
+```
+agentlint/
+  src/main.rs                # CLI wrapper — arg parsing, calls core runner
+  crates/
+    agentlint-core/          # Diagnostic type, Validator trait, discovery, formatters,
+                             #   runner, declarative plugin engine
+    agentlint-frontmatter/   # Shared YAML frontmatter parser (nom-based)
+    agentlint-claude/        # Claude Code validators
+    agentlint-cursor/        # Cursor validators
+    agentlint-codex/         # Codex validators
+    agentlint-opencode/      # OpenCode validators
+    agentlint-gemini/        # Gemini validators
+    agentlint-pi/            # Pi validators
+    agentlint-looprs/        # Looprs validators (commands, hooks, skills)
+    agentlint-docs/          # Docs frontmatter schema validation, --infer-schema,
+                             #   --emit-schema, SchemaRegistry
+    agentlint-plugins/       # Embedded declarative TOML plugin definitions
+  plugins/                   # TOML plugin files (compiled into the binary)
 ```
 
 ## Development
