@@ -18,6 +18,7 @@ dependencies = [
  "agentlint-plugins",
  "clap",
  "serde_json",
+ "tempfile",
  "walkdir",
 ]
 
@@ -42,6 +43,7 @@ dependencies = [
 name = "agentlint-core"
 version = "0.5.0"
 dependencies = [
+ "proptest",
  "serde",
  "serde_json",
  "serde_yaml",

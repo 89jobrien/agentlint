@@ -943,4 +943,49 @@ mod tests {
         };
         assert!(run_filters(diags, config).is_empty());
     }
+
+    mod glob_proptests {
+        use super::super::glob_match;
+        use proptest::prelude::*;
+
+        const PATH_CHARS: &str = "[a-z0-9/._-]{1,30}";
+
+        proptest! {
+            #[test]
+            fn literal_matches_itself(s in PATH_CHARS) {
+                prop_assert!(glob_match(&s, &s));
+            }
+
+            #[test]
+            fn literal_rejects_suffix(s in PATH_CHARS) {
+                let suffixed = format!("{s}x");
+                prop_assert!(!glob_match(&s, &suffixed));
+            }
+
+            #[test]
+            fn doublestar_matches_any_path(path in PATH_CHARS) {
+                prop_assert!(glob_match("**", &path));
+            }
+
+            #[test]
+            fn star_never_crosses_slash(path in PATH_CHARS) {
+                if glob_match("*", &path) {
+                    prop_assert!(!path.contains('/'));
+                }
+            }
+
+            #[test]
+            fn star_ext_does_not_match_nested(
+                name in "[a-z]{1,10}",
+                ext in "[a-z]{1,5}",
+                dir in "[a-z]{1,10}",
+            ) {
+                let pattern = format!("*.{ext}");
+                let flat = format!("{name}.{ext}");
+                let nested = format!("{dir}/{name}.{ext}");
+                prop_assert!(glob_match(&pattern, &flat));
+                prop_assert!(!glob_match(&pattern, &nested));
+            }
+        }
+    }
 }

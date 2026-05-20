@@ -123,3 +123,70 @@ fn resolve_json_path<'a>(v: &'a serde_json::Value, path: &str) -> Option<&'a ser
     }
     Some(current)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Feeding arbitrary strings to `parse_frontmatter` must never panic.
+        /// It should always return a `ParsedContent` variant (Fields or Error).
+        #[test]
+        fn parse_frontmatter_never_panics(input in "\\PC*") {
+            let result = parse_frontmatter(&input);
+            // Just confirm we get a valid variant, not a panic.
+            match result {
+                ParsedContent::Fields(_) | ParsedContent::Error(_) => {}
+                other => panic!(
+                    "unexpected variant from parse_frontmatter: expected Fields or Error, \
+                     got {:?}-like",
+                    std::mem::discriminant(&other)
+                ),
+            }
+        }
+
+        /// `resolve_yaml_path` must never panic regardless of the path or value.
+        /// We build a small nested YAML mapping and query it with arbitrary
+        /// dot-separated paths.
+        #[test]
+        fn resolve_yaml_path_never_panics(
+            keys in prop::collection::vec("[a-z]{1,4}", 1..5),
+            leaf in "\\PC{0,20}",
+            query_segments in prop::collection::vec("[a-z.]{1,6}", 1..6),
+        ) {
+            // Build a nested YAML mapping: keys[0] -> keys[1] -> ... -> leaf
+            let mut value = serde_yaml::Value::String(leaf);
+            for key in keys.iter().rev() {
+                let mut map = serde_yaml::Mapping::new();
+                map.insert(
+                    serde_yaml::Value::String(key.clone()),
+                    value,
+                );
+                value = serde_yaml::Value::Mapping(map);
+            }
+
+            let query = query_segments.join(".");
+            // Must not panic — returns Some or None.
+            let _ = resolve_yaml_path(&value, &query);
+        }
+
+        /// `resolve_json_path` must never panic regardless of the path or value.
+        #[test]
+        fn resolve_json_path_never_panics(
+            keys in prop::collection::vec("[a-z]{1,4}", 1..5),
+            leaf in "\\PC{0,20}",
+            query_segments in prop::collection::vec("[a-z.]{1,6}", 1..6),
+        ) {
+            let mut value = serde_json::Value::String(leaf);
+            for key in keys.iter().rev() {
+                let mut map = serde_json::Map::new();
+                map.insert(key.clone(), value);
+                value = serde_json::Value::Object(map);
+            }
+
+            let query = query_segments.join(".");
+            let _ = resolve_json_path(&value, &query);
+        }
+    }
+}

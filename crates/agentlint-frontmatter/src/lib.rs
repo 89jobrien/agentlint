@@ -13,10 +13,6 @@
 //! Produces `Vec<Field>` with 1-indexed line numbers for accurate diagnostics.
 //! Parsing is line-based; nom is used for field extraction within each line.
 //!
-// TODO(testing/fuzz): add fuzz target for parse() — nom-based parser
-// handling arbitrary byte sequences. Target: no panics on any input.
-// TODO(testing/property): add proptest for parse round-trip — generating
-// valid frontmatter strings and verifying field extraction is lossless.
 
 pub mod builder;
 
@@ -306,5 +302,74 @@ mod tests {
         let src = "---\n---\n";
         let diags = check_required(Path::new("agent.md"), src, &["name", "description"]);
         assert_eq!(diags.len(), 2);
+    }
+
+    // --- proptests ---
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        // Fuzz substitute: parse() must never panic on arbitrary input.
+        proptest! {
+            #[test]
+            fn parse_never_panics_on_arbitrary_input(s in ".*") {
+                let _ = parse(&s);
+            }
+        }
+
+        // Bias toward inputs containing `---\n` delimiters to exercise
+        // the fence-detection and field-parsing paths.
+        proptest! {
+            #[test]
+            fn parse_never_panics_with_fence_fragments(
+                prefix in "(-{0,5}\n){0,3}",
+                middle in ".{0,80}",
+                suffix in "(\n-{0,5}){0,3}",
+            ) {
+                let input = format!("{prefix}{middle}{suffix}");
+                let _ = parse(&input);
+            }
+        }
+
+        /// Round-trip: generate valid frontmatter, parse it, and verify
+        /// the extracted fields match the generated key-value pairs.
+        fn key_strategy() -> impl Strategy<Value = String> {
+            prop::string::string_regex("[a-zA-Z][a-zA-Z0-9_-]{0,20}").unwrap()
+        }
+
+        fn value_strategy() -> impl Strategy<Value = String> {
+            prop::string::string_regex("[a-zA-Z0-9 _./-]{0,60}").unwrap()
+        }
+
+        proptest! {
+            #[test]
+            fn parse_round_trip_valid_frontmatter(
+                fields in prop::collection::vec(
+                    (key_strategy(), value_strategy()),
+                    1..=8,
+                ),
+            ) {
+                // Build a valid frontmatter string.
+                let mut src = String::from("---\n");
+                for (k, v) in &fields {
+                    src.push_str(&format!("{k}: {v}\n"));
+                }
+                src.push_str("---\nbody\n");
+
+                let parsed = parse(&src).expect("valid frontmatter must parse");
+
+                // Same number of fields (keys that parse_field accepts).
+                prop_assert_eq!(parsed.len(), fields.len());
+
+                for (i, (k, v)) in fields.iter().enumerate() {
+                    prop_assert_eq!(&parsed[i].key, k);
+                    // Values are trimmed by the parser.
+                    prop_assert_eq!(&parsed[i].value, v.trim());
+                    // Line numbers are 1-indexed; first field is line 2.
+                    prop_assert_eq!(parsed[i].line, i + 2);
+                }
+            }
+        }
     }
 }

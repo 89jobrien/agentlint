@@ -77,4 +77,12 @@ serde_json         = { workspace = true }
 walkdir            = { workspace = true }
 
 [dev-dependencies]
-agentlint-core = { workspace = true, features = ["test-utils"] }
+agentlint-core     = { workspace = true, features = ["test-utils"] }
+agentlint-claude   = { workspace = true }
+agentlint-cursor   = { workspace = true }
+agentlint-codex    = { workspace = true }
+agentlint-opencode = { workspace = true }
+agentlint-gemini   = { workspace = true }
+agentlint-pi       = { workspace = true }
+agentlint-looprs   = { workspace = true }
+tempfile           = { workspace = true }
