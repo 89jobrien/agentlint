@@ -58,8 +58,8 @@ Do something useful.
 /// Valid Cursor rule file (.mdc with frontmatter).
 const VALID_CURSOR_RULE: &str = "\
 ---
-name: test-rule
 description: A test cursor rule
+alwaysApply: true
 ---
 
 Follow these rules when editing code.
@@ -126,11 +126,7 @@ fn empty_agents_md_produces_errors_from_multiple_validators() {
     let result = run(&[PathBuf::from(root)], &validators, &config);
 
     // codex, opencode, and pi all claim AGENTS.md and reject empty content.
-    let rules: Vec<&str> = result
-        .diagnostics
-        .iter()
-        .filter_map(|d| d.rule.as_deref())
-        .collect();
+    let rules: Vec<&str> = result.diagnostics.iter().map(|d| d.rule).collect();
 
     assert!(
         rules.iter().any(|r| r.starts_with("codex/")),
