@@ -3,6 +3,7 @@
 mod eval;
 pub(crate) mod parse;
 pub mod types;
+mod validator;
 
 #[cfg(test)]
 mod tests;
@@ -10,11 +11,11 @@ mod tests;
 use crate::Validator;
 use std::path::Path;
 
-pub use eval::DeclarativeValidator;
 pub use types::{
     Check, DifficultyDef, Format, PluginFile, PluginMeta, RuleDef, SeverityDef, ValidatorDef,
     ValuesOrRef,
 };
+pub use validator::DeclarativeValidator;
 
 // -------------------------------------------------------------------------
 // Loading

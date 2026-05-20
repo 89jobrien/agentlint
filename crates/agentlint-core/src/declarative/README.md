@@ -5,13 +5,14 @@ This is the engine behind `agentlint-plugins` and external plugin loading.
 
 ## Module layout
 
-| File       | Responsibility                                                                                            |
-| ---------- | --------------------------------------------------------------------------------------------------------- |
-| `mod.rs`   | Re-exports, TOML loading (`load_plugin_file`, `load_plugin_str`), convenience constructors                |
-| `types.rs` | Serde-derived TOML schema: `PluginFile`, `ValidatorDef`, `RuleDef`, `Check`, etc.                         |
-| `parse.rs` | `ParsedContent` enum, format-specific parsers (YAML/JSON/frontmatter/markdown), field access helpers      |
-| `eval.rs`  | `DeclarativeValidator` — implements `Validator` trait, dispatches `Check` variants against parsed content |
-| `tests.rs` | Tests against embedded looprs and claude TOML plugins                                                     |
+| File           | Responsibility                                                                          |
+| -------------- | --------------------------------------------------------------------------------------- |
+| `mod.rs`       | Re-exports, TOML loading (`load_plugin_file`, `load_plugin_str`), convenience ctors     |
+| `types.rs`     | Serde-derived TOML schema: `PluginFile`, `ValidatorDef`, `RuleDef`, `Check`, etc.       |
+| `parse.rs`     | `ParsedContent` enum, format-specific parsers (YAML/JSON/frontmatter/md), field helpers |
+| `validator.rs` | `DeclarativeValidator` struct, `new()`, `make_diag`, `resolve_values`, `Validator` impl |
+| `eval.rs`      | `eval_rule()` — the big `Check` match that dispatches each rule variant                 |
+| `tests.rs`     | Tests against embedded looprs and claude TOML plugins                                   |
 
 ## Data flow
 
