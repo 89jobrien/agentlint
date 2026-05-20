@@ -9,8 +9,9 @@ publish.workspace = true
 description = "Core primitives for agentlint: Diagnostic, Validator trait, file runner, and output formatters"
 
 [features]
-test-utils = ["dep:tempfile"]
-config     = ["dep:toml", "dep:serde"]
+test-utils   = ["dep:tempfile"]
+config       = ["dep:toml", "dep:serde"]
+declarative  = ["dep:toml", "dep:serde", "dep:serde_yaml"]
 
 [dependencies]
 serde_json = { workspace = true }
@@ -18,6 +19,7 @@ walkdir    = { workspace = true }
 tempfile   = { workspace = true, optional = true }
 toml       = { workspace = true, optional = true }
 serde      = { workspace = true, optional = true }
+serde_yaml = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -1,0 +1,255 @@
+# Declarative plugin: Claude Code agent harness validator
+# Covers structural/schema rules. Behavioral rules (hooks pattern matching,
+# secret detection, infinite loop detection) remain in the Rust crate.
+
+[plugin]
+name = "claude"
+prefix = "claude"
+
+[plugin.constants]
+builtin_tools = [
+    "bash", "edit", "read", "glob", "write", "grep",
+    "webfetch", "websearch", "agent", "task", "notebook",
+]
+known_settings_keys = [
+    "permissions", "env", "hooks", "mcpServers", "model",
+    "apiKeyHelper", "includeCoAuthoredBy", "enabledMcpjsonServers",
+    "cleanupPeriodDays", "effortLevel", "enabledPlugins",
+    "extraKnownMarketplaces", "fastMode",
+    "skipDangerousModePermissionPrompt", "statusLine", "verbose",
+    "attribution",
+]
+known_models = [
+    "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001",
+    "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022",
+    "claude-3-opus-20240229", "claude-3-sonnet-20240229",
+    "claude-3-haiku-20240307",
+    "opus", "sonnet", "haiku",
+    "inherit",
+]
+
+# --- Agents (.claude/agents/**/*.md) ---
+
+[[validator]]
+id = "agents"
+patterns = [".claude/agents/**/*.md"]
+format = "frontmatter"
+
+[[validator.rules]]
+id = "claude/agents/missing-frontmatter"
+check = "has-frontmatter"
+severity = "error"
+difficulty = "easy"
+message = "missing or invalid frontmatter"
+
+[[validator.rules]]
+id = "claude/agents/missing-name"
+check = "field-required"
+field = "name"
+severity = "error"
+difficulty = "easy"
+message = "missing required field 'name'"
+
+[[validator.rules]]
+id = "claude/agents/missing-description"
+check = "field-required"
+field = "description"
+severity = "error"
+difficulty = "easy"
+message = "missing required field 'description'"
+
+[[validator.rules]]
+id = "claude/agents/name-collision"
+check = "field-not-one-of-ci"
+field = "name"
+values = "$builtin_tools"
+severity = "error"
+difficulty = "hard"
+message = "agent name collides with a built-in Claude Code tool name"
+
+[[validator.rules]]
+id = "claude/agents/description-too-short"
+check = "field-min-length"
+field = "description"
+min = 20
+severity = "warning"
+difficulty = "painful"
+message = "agent description is too short"
+
+# --- Skills (.claude/skills/**/SKILL.md) ---
+# Note: name format validation (kebab-case, dir match) remains in Rust.
+
+[[validator]]
+id = "skills"
+patterns = [".claude/skills/**/SKILL.md"]
+format = "frontmatter"
+
+[[validator.rules]]
+id = "claude/skills/missing-frontmatter"
+check = "has-frontmatter"
+severity = "error"
+difficulty = "easy"
+message = "missing frontmatter: file must start with '---'"
+
+[[validator.rules]]
+id = "claude/skills/missing-name"
+check = "field-required"
+field = "name"
+severity = "error"
+difficulty = "easy"
+message = "missing required field 'name'"
+
+[[validator.rules]]
+id = "claude/skills/missing-description"
+check = "field-required"
+field = "description"
+severity = "error"
+difficulty = "easy"
+message = "missing required field 'description'"
+
+[[validator.rules]]
+id = "claude/skills/name-too-long"
+check = "field-max-length"
+field = "name"
+max = 64
+severity = "error"
+difficulty = "easy"
+message = "'name' exceeds 64 characters"
+
+[[validator.rules]]
+id = "claude/skills/description-too-long"
+check = "field-max-length"
+field = "description"
+max = 1024
+severity = "error"
+difficulty = "easy"
+message = "'description' exceeds 1024 characters"
+
+# --- Commands (.claude/commands/**/*.md) ---
+
+[[validator]]
+id = "commands"
+patterns = [".claude/commands/**/*.md"]
+format = "frontmatter"
+
+[[validator.rules]]
+id = "claude/commands/missing-frontmatter"
+check = "has-frontmatter"
+severity = "error"
+difficulty = "easy"
+message = "missing or invalid frontmatter"
+
+[[validator.rules]]
+id = "claude/commands/missing-name"
+check = "field-required"
+field = "name"
+severity = "error"
+difficulty = "easy"
+message = "missing required field 'name'"
+
+[[validator.rules]]
+id = "claude/commands/missing-description"
+check = "field-required"
+field = "description"
+severity = "error"
+difficulty = "easy"
+message = "missing required field 'description'"
+
+# --- Hooks (.claude/hooks/**) ---
+# Note: most hook rules (naive-str-match, exit-code, infinite-loop, sleep)
+# remain in Rust. Only the shebang check is expressible here.
+
+[[validator]]
+id = "hooks"
+patterns = [".claude/hooks/**"]
+format = "markdown"
+
+[[validator.rules]]
+id = "claude/hooks/missing-shebang"
+check = "has-shebang"
+severity = "error"
+difficulty = "easy"
+message = "hook file must have a shebang line (#!) on line 1"
+
+# --- Settings (.claude/settings.json, .claude/settings.local.json) ---
+# Note: most settings rules (permissions, hooks structure, env scanning)
+# remain in Rust. Only structural checks are here.
+
+[[validator]]
+id = "settings"
+patterns = [".claude/settings.json", ".claude/settings.local.json"]
+format = "json"
+
+[[validator.rules]]
+id = "claude/settings/invalid-json"
+check = "valid-parse"
+severity = "error"
+difficulty = "easy"
+message = "invalid JSON"
+
+[[validator.rules]]
+id = "claude/settings/not-object"
+check = "is-object"
+severity = "error"
+difficulty = "easy"
+message = "settings must be a JSON object"
+
+[[validator.rules]]
+id = "claude/settings/unknown-key"
+check = "known-keys"
+values = "$known_settings_keys"
+severity = "error"
+difficulty = "hard"
+message = "unknown top-level key"
+
+# --- MCP (.mcp.json) ---
+# Note: transport checks, secret detection, fetch detection remain in Rust.
+
+[[validator]]
+id = "mcp"
+patterns = [".mcp.json"]
+format = "json"
+
+[[validator.rules]]
+id = "claude/mcp/invalid-json"
+check = "valid-parse"
+severity = "error"
+difficulty = "easy"
+message = "invalid JSON"
+
+[[validator.rules]]
+id = "claude/mcp/not-object"
+check = "is-object"
+severity = "error"
+difficulty = "easy"
+message = ".mcp.json must be a JSON object"
+
+[[validator.rules]]
+id = "claude/mcp/missing-mcpservers"
+check = "field-exists"
+field = "mcpServers"
+severity = "error"
+difficulty = "easy"
+message = ".mcp.json must have a top-level 'mcpServers' object"
+
+# --- CLAUDE.md ---
+
+[[validator]]
+id = "meta"
+patterns = ["CLAUDE.md", "**/CLAUDE.md"]
+format = "markdown"
+
+[[validator.rules]]
+id = "claude/meta/claude-md-no-heading"
+check = "has-heading"
+severity = "warning"
+difficulty = "painful"
+message = "CLAUDE.md has no markdown headings; consider adding section headings"
+
+[[validator.rules]]
+id = "claude/meta/claude-md-too-long"
+check = "max-lines"
+max = 500
+severity = "warning"
+difficulty = "painful"
+message = "CLAUDE.md exceeds 500 lines; consider splitting into smaller files"

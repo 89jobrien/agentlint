@@ -132,6 +132,7 @@ impl SettingsValidator {
             "opus",
             "sonnet",
             "haiku",
+            "inherit",
         ];
         if let Some(model) = obj.get("model").and_then(|v| v.as_str())
             && !KNOWN_MODELS.contains(&model)

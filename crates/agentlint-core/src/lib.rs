@@ -6,6 +6,8 @@ pub mod testing;
 
 #[cfg(feature = "config")]
 pub mod config;
+#[cfg(feature = "declarative")]
+pub mod declarative;
 pub use config_types::{IgnoreEntry, RuleOverride};
 
 mod config_types {

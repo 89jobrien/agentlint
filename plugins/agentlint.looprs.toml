@@ -1,0 +1,254 @@
+# Declarative plugin: looprs agent harness validator
+# Validates .looprs/ directory structure (commands, hooks, skills, agents, rules, config)
+
+[plugin]
+name = "looprs"
+prefix = "looprs"
+
+# Known event triggers for hook validation
+[plugin.constants]
+known_triggers = [
+    "SessionStart",
+    "SessionEnd",
+    "UserPromptSubmit",
+    "PreToolUse",
+    "PostToolUse",
+    "InferenceComplete",
+    "OnError",
+    "OnWarning",
+    "DelegationStart",
+    "DelegationComplete",
+]
+
+# --- Commands ---
+
+[[validator]]
+id = "commands"
+patterns = [".looprs/commands/*.yaml", ".looprs/commands/*.yml"]
+format = "yaml"
+
+[[validator.rules]]
+id = "looprs/commands/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "command file is empty"
+
+[[validator.rules]]
+id = "looprs/commands/missing-name"
+check = "field-required"
+field = "name"
+severity = "error"
+difficulty = "easy"
+message = "missing or empty 'name' field"
+
+[[validator.rules]]
+id = "looprs/commands/missing-description"
+check = "field-required"
+field = "description"
+severity = "warning"
+difficulty = "hard"
+message = "missing or empty 'description' field"
+
+[[validator.rules]]
+id = "looprs/commands/missing-action"
+check = "field-exists"
+field = "action"
+severity = "error"
+difficulty = "easy"
+message = "missing 'action' field"
+
+[[validator.rules]]
+id = "looprs/commands/invalid-action-type"
+check = "field-one-of"
+field = "action.type"
+values = ["prompt", "shell", "message"]
+severity = "error"
+difficulty = "easy"
+message = "action.type must be one of: prompt, shell, message"
+
+# --- Hooks ---
+
+[[validator]]
+id = "hooks"
+patterns = [".looprs/hooks/*.yaml", ".looprs/hooks/*.yml"]
+format = "yaml"
+
+[[validator.rules]]
+id = "looprs/hooks/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "hook file is empty"
+
+[[validator.rules]]
+id = "looprs/hooks/missing-name"
+check = "field-required"
+field = "name"
+severity = "error"
+difficulty = "easy"
+message = "missing or empty 'name' field"
+
+[[validator.rules]]
+id = "looprs/hooks/missing-trigger"
+check = "field-required"
+field = "trigger"
+severity = "error"
+difficulty = "easy"
+message = "missing or empty 'trigger' field"
+
+[[validator.rules]]
+id = "looprs/hooks/unknown-trigger"
+check = "field-one-of"
+field = "trigger"
+values = "$known_triggers"
+severity = "warning"
+difficulty = "hard"
+message = "unknown trigger — not in known event list"
+
+[[validator.rules]]
+id = "looprs/hooks/empty-actions"
+check = "array-non-empty"
+field = "actions"
+severity = "error"
+difficulty = "easy"
+message = "actions list is empty"
+
+# --- Skills ---
+
+[[validator]]
+id = "skills"
+patterns = [".looprs/skills/**/SKILL.md"]
+format = "frontmatter"
+
+[[validator.rules]]
+id = "looprs/skills/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "SKILL.md is empty"
+
+[[validator.rules]]
+id = "looprs/skills/missing-frontmatter"
+check = "has-frontmatter"
+severity = "error"
+difficulty = "easy"
+message = "missing or invalid frontmatter"
+
+[[validator.rules]]
+id = "looprs/skills/missing-name"
+check = "field-required"
+field = "name"
+severity = "error"
+difficulty = "easy"
+message = "missing or empty 'name' in frontmatter"
+
+[[validator.rules]]
+id = "looprs/skills/missing-triggers"
+check = "field-exists"
+field = "triggers"
+severity = "error"
+difficulty = "easy"
+message = "missing 'triggers' in frontmatter"
+
+# --- Agents ---
+
+[[validator]]
+id = "agents"
+patterns = [".looprs/agents/*.yaml", ".looprs/agents/*.yml"]
+format = "yaml"
+
+[[validator.rules]]
+id = "looprs/agents/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "agent file is empty"
+
+[[validator.rules]]
+id = "looprs/agents/missing-name"
+check = "field-required"
+field = "name"
+severity = "error"
+difficulty = "easy"
+message = "missing or empty 'name' field"
+
+# --- Rules ---
+
+[[validator]]
+id = "rules"
+patterns = [".looprs/rules/*.md"]
+format = "markdown"
+skip_filenames = ["README.md"]
+
+[[validator.rules]]
+id = "looprs/rules/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "rule file is empty"
+
+[[validator.rules]]
+id = "looprs/rules/no-heading"
+check = "has-heading"
+severity = "warning"
+difficulty = "hard"
+message = "rule file has no markdown heading"
+
+# --- Config ---
+
+[[validator]]
+id = "config"
+patterns = [".looprs/config.json"]
+format = "json"
+
+[[validator.rules]]
+id = "looprs/config/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "config.json is empty"
+
+[[validator.rules]]
+id = "looprs/config/valid-json"
+check = "valid-parse"
+severity = "error"
+difficulty = "easy"
+message = "invalid JSON"
+
+# --- Agent JSON ---
+
+[[validator]]
+id = "agent-json"
+patterns = ["*.agent.json"]
+format = "json"
+
+[[validator.rules]]
+id = "looprs/agent-json/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "agent.json is empty"
+
+[[validator.rules]]
+id = "looprs/agent-json/not-object"
+check = "is-object"
+severity = "error"
+difficulty = "easy"
+message = "agent.json must be a JSON object"
+
+[[validator.rules]]
+id = "looprs/agent-json/missing-version"
+check = "field-exists"
+field = "version"
+severity = "warning"
+difficulty = "hard"
+message = "missing 'version' field"
+
+[[validator.rules]]
+id = "looprs/agent-json/missing-schema"
+check = "field-exists"
+field = "agent_schema"
+severity = "warning"
+difficulty = "hard"
+message = "missing 'agent_schema' field"
