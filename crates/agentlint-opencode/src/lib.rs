@@ -135,7 +135,23 @@ impl Validator for OpenCodeJsonValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agentlint_core::testing::{assert_validator_contract, assert_validator_rejects_empty};
     use std::path::Path;
+
+    #[test]
+    fn conformance_agents() {
+        assert_validator_contract(&AgentsMarkdownValidator);
+    }
+
+    #[test]
+    fn conformance_json() {
+        assert_validator_contract(&OpenCodeJsonValidator);
+    }
+
+    #[test]
+    fn rejects_empty_agents() {
+        assert_validator_rejects_empty(&AgentsMarkdownValidator, "AGENTS.md");
+    }
 
     #[test]
     fn agents_non_empty_with_heading_and_commands_is_clean() {

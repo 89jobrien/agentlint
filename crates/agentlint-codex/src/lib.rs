@@ -79,7 +79,18 @@ impl Validator for CodexValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agentlint_core::testing::{assert_validator_contract, assert_validator_rejects_empty};
     use std::path::Path;
+
+    #[test]
+    fn conformance() {
+        assert_validator_contract(&CodexValidator);
+    }
+
+    #[test]
+    fn rejects_empty() {
+        assert_validator_rejects_empty(&CodexValidator, "AGENTS.md");
+    }
 
     #[test]
     fn non_empty_with_heading_is_clean() {

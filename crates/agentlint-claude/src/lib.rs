@@ -112,3 +112,19 @@ impl Validator for ClaudeValidator {
         agents::check_duplicate_names(&agent_files)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agentlint_core::testing::{assert_validator_contract, assert_validator_rejects_empty};
+
+    #[test]
+    fn conformance() {
+        assert_validator_contract(&ClaudeValidator);
+    }
+
+    #[test]
+    fn rejects_empty_agent() {
+        assert_validator_rejects_empty(&ClaudeValidator, ".claude/agents/test.md");
+    }
+}

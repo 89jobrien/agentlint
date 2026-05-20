@@ -9,7 +9,18 @@ $ agentlint
 .claude/commands/deploy.md:3:1: error: missing required field 'description'
 .claude/settings.json:1:1: error: unknown top-level key 'theme'
 .mcp.json:1:1: error: mcpServers.my-server: server entry must have 'command' or 'url' transport
-3 errors, 1 warning
+
+  Files checked : 14
+    agents        : 3
+    claude-md     : 1
+    commands      : 2
+    docs          : 4
+    mcp           : 1
+    settings      : 1
+    skills        : 2
+  Validators    : 55
+  Errors        : 4
+  Warnings      : 0
 ```
 
 ## Supported platforms
@@ -45,6 +56,9 @@ agentlint --format json
 
 # Audit mode — report issues but always exit 0
 agentlint --exit-zero
+
+# Suppress the summary stats table
+agentlint --quiet
 ```
 
 ### Exit codes

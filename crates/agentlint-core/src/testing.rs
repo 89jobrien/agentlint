@@ -114,15 +114,63 @@ pub fn assert_clean(diags: &[Diagnostic]) {
     );
 }
 
-// TODO(testing/conformance): add `assert_validator_contract(v: &dyn
-// Validator)` here. Each per-platform crate calls it in its own tests
-// to verify the Validator trait contract holds for every impl:
-//   1. v.patterns() is non-empty
-//   2. v.validate(dummy_path, "") does not panic
-//   3. v.validate_batch(&[]) returns empty vec
-//   4. v.validate(dummy_path, random_utf8) does not panic (basic fuzz)
-// Also add `assert_validator_rejects_empty(v, path)` for validators
-// that should flag empty files.
+/// Verify that a [`Validator`] implementation satisfies the trait contract:
+///
+/// 1. `patterns()` returns a non-empty slice
+/// 2. `validate(dummy_path, "")` does not panic
+/// 3. `validate_batch(&[])` returns an empty vec
+/// 4. `validate(dummy_path, <random UTF-8>)` does not panic (basic fuzz)
+pub fn assert_validator_contract(v: &dyn crate::Validator) {
+    // 1. patterns() is non-empty
+    let patterns = v.patterns();
+    assert!(
+        !patterns.is_empty(),
+        "Validator::patterns() must return at least one pattern"
+    );
+
+    // 2. validate on empty string does not panic
+    let dummy = std::path::PathBuf::from(patterns[0].replace("**/*", "test").replace('*', "test"));
+    let _ = v.validate(&dummy, "");
+
+    // 3. validate_batch on empty slice returns empty vec
+    let batch = v.validate_batch(&[]);
+    assert!(
+        batch.is_empty(),
+        "validate_batch(&[]) must return empty vec, got {} diagnostics",
+        batch.len()
+    );
+
+    // 4. validate on various UTF-8 inputs does not panic
+    let fuzz_inputs = [
+        "hello world",
+        "---\n---\n",
+        "---\nname: test\ndescription: test\n---\nbody",
+        "{ \"key\": \"value\" }",
+        "{}\n",
+        "# Heading\n\n## Sub\n\nContent line one.\nContent line two.\n\
+         Content line three.\nContent line four.\nContent line five.",
+        "\x00\x01\x02",
+        "\u{FEFF}BOM content",
+        &"a".repeat(10_000),
+        "---\n\x00: bad\n---\n",
+    ];
+    for input in &fuzz_inputs {
+        let _ = v.validate(&dummy, input);
+    }
+}
+
+/// Assert that a [`Validator`] produces at least one error when given an
+/// empty file at `filename`.
+pub fn assert_validator_rejects_empty(v: &dyn crate::Validator, filename: &str) {
+    let path = std::path::PathBuf::from(filename);
+    let diags = v.validate(&path, "");
+    assert!(
+        diags.iter().any(|d| matches!(d.severity, Severity::Error)),
+        "expected at least one error for empty file {:?}\ngot diagnostics:\n{}",
+        filename,
+        fmt_diags(&diags),
+    );
+}
 
 fn fmt_diags(diags: &[Diagnostic]) -> String {
     if diags.is_empty() {

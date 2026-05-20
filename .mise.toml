@@ -1,0 +1,9 @@
+[tools]
+rust = "latest"
+
+[tasks.build]
+run = "cargo build --release"
+
+[tasks.install]
+depends = ["build"]
+run = "cargo install --path . --force"

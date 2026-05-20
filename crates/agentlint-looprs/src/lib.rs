@@ -268,7 +268,43 @@ mod agent_json {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agentlint_core::testing::assert_validator_contract;
     use std::path::Path;
+
+    #[test]
+    fn conformance_commands() {
+        assert_validator_contract(&CommandsValidator);
+    }
+
+    #[test]
+    fn conformance_hooks() {
+        assert_validator_contract(&HooksValidator);
+    }
+
+    #[test]
+    fn conformance_skills() {
+        assert_validator_contract(&SkillsValidator);
+    }
+
+    #[test]
+    fn conformance_agents() {
+        assert_validator_contract(&AgentsValidator);
+    }
+
+    #[test]
+    fn conformance_rules() {
+        assert_validator_contract(&RulesValidator);
+    }
+
+    #[test]
+    fn conformance_config() {
+        assert_validator_contract(&ConfigValidator);
+    }
+
+    #[test]
+    fn conformance_agent_json() {
+        assert_validator_contract(&AgentJsonValidator);
+    }
 
     // --- commands ---
 

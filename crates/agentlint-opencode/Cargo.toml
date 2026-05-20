@@ -11,3 +11,6 @@ description = "agentlint validator for OpenCode AGENTS.md and opencode.json file
 [dependencies]
 agentlint-core = { workspace = true }
 serde_json     = { workspace = true }
+
+[dev-dependencies]
+agentlint-core = { workspace = true, features = ["test-utils"] }

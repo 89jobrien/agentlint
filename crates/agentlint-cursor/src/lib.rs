@@ -172,10 +172,16 @@ impl Validator for CursorValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agentlint_core::testing::assert_validator_contract;
     use std::path::Path;
 
     fn v() -> CursorValidator {
         CursorValidator
+    }
+
+    #[test]
+    fn conformance() {
+        assert_validator_contract(&CursorValidator);
     }
 
     #[test]

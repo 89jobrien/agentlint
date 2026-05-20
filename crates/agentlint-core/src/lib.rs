@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "test-utils")]
@@ -215,16 +215,6 @@ impl Diagnostic {
 // Validator trait
 // ---------------------------------------------------------------------------
 
-// TODO(testing/conformance): add a shared conformance test suite for
-// Validator impls. Every impl must satisfy:
-//   1. patterns() returns a non-empty slice
-//   2. validate("", empty_string) returns at least one diagnostic (or none
-//      if the validator explicitly allows empty files)
-//   3. validate() never panics on arbitrary UTF-8 input
-//   4. validate_batch([]) returns empty vec
-// Wire this via a `assert_validator_contract(v: &dyn Validator)` helper
-// in the `testing` module, called from each per-platform crate's tests.
-
 pub trait Validator: Send + Sync {
     /// File glob patterns this validator claims (e.g. `.claude/agents/**/*.md`).
     fn patterns(&self) -> &[&str];
@@ -259,6 +249,8 @@ pub enum OutputFormat {
 pub struct RunResult {
     pub diagnostics: Vec<Diagnostic>,
     pub files_checked: usize,
+    /// Per-category file counts (e.g. "agents" -> 3, "skills" -> 5).
+    pub file_counts: BTreeMap<String, usize>,
 }
 
 /// Pure domain runner: dispatch `files` (already-loaded path+content pairs) to
@@ -273,6 +265,7 @@ pub fn run_on(
 ) -> RunResult {
     let mut diagnostics = Vec::new();
     let mut files_checked = 0;
+    let mut file_counts: BTreeMap<String, usize> = BTreeMap::new();
 
     // Collect all files first so we can run cross-file batch checks after.
     let all_files: Vec<(PathBuf, String)> = files.into_iter().collect();
@@ -283,6 +276,8 @@ pub fn run_on(
             continue;
         }
         files_checked += 1;
+        let cat = categorize_path(path);
+        *file_counts.entry(cat).or_insert(0) += 1;
         for validator in matched {
             diagnostics.extend(validator.validate(path, src));
         }
@@ -342,6 +337,7 @@ pub fn run_on(
     RunResult {
         diagnostics: kept,
         files_checked,
+        file_counts,
     }
 }
 
@@ -447,6 +443,36 @@ fn find_validators<'a>(
         })
         .map(|v| v.as_ref())
         .collect()
+}
+
+/// Classify a file path into a human-readable category for stats display.
+fn categorize_path(path: &Path) -> String {
+    let s = path.to_string_lossy();
+    // Order matters — more specific patterns first.
+    let rules: &[(&[&str], &str)] = &[
+        (&["agents/", "agents\\"], "agents"),
+        (&["skills/", "skills\\"], "skills"),
+        (&["commands/", "commands\\"], "commands"),
+        (&["hooks/", "hooks\\"], "hooks"),
+        (&["rules/", "rules\\"], "rules"),
+        (&["settings.json", "settings.local.json"], "settings"),
+        (&[".mcp.json"], "mcp"),
+        (&["CLAUDE.md"], "claude-md"),
+        (&["AGENTS.md"], "agents-md"),
+        (&["GEMINI.md"], "gemini-md"),
+        (&["SYSTEM.md"], "system-md"),
+        (&[".cursorrules"], "cursorrules"),
+        (&[".cursor/rules"], "cursor-rules"),
+        (&["opencode.json"], "opencode"),
+        (&["docs/"], "docs"),
+        (&["agent.json"], "agent-json"),
+    ];
+    for (patterns, label) in rules {
+        if patterns.iter().any(|p| s.contains(p)) {
+            return label.to_string();
+        }
+    }
+    "other".to_string()
 }
 
 // TODO(testing/property): add proptest for glob_match — the input space

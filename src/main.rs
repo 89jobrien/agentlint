@@ -30,6 +30,10 @@ struct Cli {
     #[arg(long)]
     exit_zero: bool,
 
+    /// Suppress the summary stats table
+    #[arg(long, short)]
+    quiet: bool,
+
     /// Infer docs schema from corpus and validate outliers against it
     #[arg(long)]
     infer_schema: bool,
@@ -138,6 +142,17 @@ fn main() {
         .iter()
         .any(|d| matches!(d.severity, agentlint_core::Severity::Error));
 
+    let errors = result
+        .diagnostics
+        .iter()
+        .filter(|d| matches!(d.severity, agentlint_core::Severity::Error))
+        .count();
+    let warnings = result
+        .diagnostics
+        .iter()
+        .filter(|d| matches!(d.severity, agentlint_core::Severity::Warning))
+        .count();
+
     if !result.diagnostics.is_empty() {
         let output = match format {
             OutputFormat::Gnu => format_gnu(&result.diagnostics),
@@ -147,16 +162,6 @@ fn main() {
         print!("{output}");
 
         if matches!(format, OutputFormat::Gnu) {
-            let errors = result
-                .diagnostics
-                .iter()
-                .filter(|d| matches!(d.severity, agentlint_core::Severity::Error))
-                .count();
-            let warnings = result
-                .diagnostics
-                .iter()
-                .filter(|d| matches!(d.severity, agentlint_core::Severity::Warning))
-                .count();
             match (errors, warnings) {
                 (e, 0) => eprintln!("{e} error{}", if e == 1 { "" } else { "s" }),
                 (0, w) => eprintln!("{w} warning{}", if w == 1 { "" } else { "s" }),
@@ -166,6 +171,23 @@ fn main() {
                     if w == 1 { "" } else { "s" },
                 ),
             }
+        }
+    }
+
+    // Summary stats table (shown by default, suppressed with --quiet).
+    if !cli.quiet {
+        let files = result.files_checked;
+        let validator_count = validators.len();
+        eprintln!();
+        eprintln!("  Files checked : {files}");
+        for (cat, count) in &result.file_counts {
+            eprintln!("    {cat:<14}: {count}");
+        }
+        eprintln!("  Validators    : {validator_count}");
+        eprintln!("  Errors        : {errors}");
+        eprintln!("  Warnings      : {warnings}");
+        if errors == 0 && warnings == 0 {
+            eprintln!("  Result        : all clean");
         }
     }
 
