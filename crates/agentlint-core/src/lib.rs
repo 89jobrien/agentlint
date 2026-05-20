@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "test-utils")]
@@ -358,7 +358,7 @@ pub fn run_on(
 pub fn run(roots: &[PathBuf], validators: &[Box<dyn Validator>], config: &RunConfig) -> RunResult {
     let mut read_errors: Vec<Diagnostic> = Vec::new();
 
-    let files: Vec<(PathBuf, String)> = collect_paths(roots)
+    let files: Vec<(PathBuf, String)> = collect_paths(roots, validators)
         .into_iter()
         .filter(|path| !find_validators(path, validators).is_empty())
         .filter_map(|path| {
@@ -389,7 +389,35 @@ pub fn run(roots: &[PathBuf], validators: &[Box<dyn Validator>], config: &RunCon
 /// Directory names that are never walked (build artifacts, VCS, package caches).
 const SKIP_DIRS: &[&str] = &["target", ".git", "node_modules", "plugins", ".maestro"];
 
-fn collect_paths(roots: &[PathBuf]) -> Vec<PathBuf> {
+/// Extract literal top-level directory prefixes from validator patterns.
+///
+/// For a pattern like `.claude/agents/**/*.md`, this returns `.claude`.
+/// Patterns starting with `**` or bare filenames (no `/`) contribute nothing
+/// — they match at any depth but don't justify entering arbitrary directories.
+fn interesting_prefixes(validators: &[Box<dyn Validator>]) -> HashSet<String> {
+    let mut prefixes = HashSet::new();
+    for v in validators {
+        for pat in v.patterns() {
+            // Skip patterns that match at arbitrary depth
+            if pat.starts_with("**") {
+                continue;
+            }
+            // Extract the first path component if it's a directory prefix
+            if let Some(slash_pos) = pat.find('/') {
+                let prefix = &pat[..slash_pos];
+                if !prefix.contains('*') {
+                    prefixes.insert(prefix.to_string());
+                }
+            }
+            // Bare filenames (CLAUDE.md, AGENTS.md, .mcp.json) are collected
+            // at root level — they don't need directory descent.
+        }
+    }
+    prefixes
+}
+
+fn collect_paths(roots: &[PathBuf], validators: &[Box<dyn Validator>]) -> Vec<PathBuf> {
+    let prefixes = interesting_prefixes(validators);
     let mut out = Vec::new();
     for root in roots {
         if root.is_file() {
@@ -401,7 +429,16 @@ fn collect_paths(roots: &[PathBuf]) -> Vec<PathBuf> {
                 .filter_entry(|e| {
                     if e.file_type().is_dir() {
                         let name = e.file_name().to_string_lossy();
-                        !SKIP_DIRS.iter().any(|skip| *skip == name.as_ref())
+                        if SKIP_DIRS.iter().any(|skip| *skip == name.as_ref()) {
+                            return false;
+                        }
+                        // At depth 1, only enter directories that match a
+                        // known pattern prefix. This prevents scanning the
+                        // entire home directory when run from ~.
+                        if e.depth() == 1 && !prefixes.contains(name.as_ref()) {
+                            return false;
+                        }
+                        true
                     } else {
                         true
                     }
@@ -656,6 +693,36 @@ pub fn format_json(diagnostics: &[Diagnostic]) -> String {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    #[test]
+    fn interesting_prefixes_extracts_literal_dirs() {
+        struct FakeValidator(&'static [&'static str]);
+        impl Validator for FakeValidator {
+            fn patterns(&self) -> &[&str] {
+                self.0
+            }
+            fn validate(&self, _: &Path, _: &str) -> Vec<Diagnostic> {
+                vec![]
+            }
+        }
+
+        let validators: Vec<Box<dyn Validator>> = vec![
+            Box::new(FakeValidator(&[".claude/agents/**/*.md"])),
+            Box::new(FakeValidator(&[".cursor/rules/**/*.mdc"])),
+            Box::new(FakeValidator(&["CLAUDE.md", "**/CLAUDE.md"])),
+            Box::new(FakeValidator(&["docs/**/*.md"])),
+            Box::new(FakeValidator(&[".mcp.json"])),
+        ];
+
+        let prefixes = interesting_prefixes(&validators);
+        assert!(prefixes.contains(".claude"));
+        assert!(prefixes.contains(".cursor"));
+        assert!(prefixes.contains("docs"));
+        // Bare filenames and ** patterns should NOT produce prefixes
+        assert!(!prefixes.contains("CLAUDE.md"));
+        assert!(!prefixes.contains("**"));
+        assert!(!prefixes.contains(".mcp.json"));
+    }
 
     #[test]
     fn glob_literal() {

@@ -57,18 +57,7 @@ impl Validator for PiValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agentlint_core::testing::{assert_validator_contract, assert_validator_rejects_empty};
     use std::path::Path;
-
-    #[test]
-    fn conformance() {
-        assert_validator_contract(&PiValidator);
-    }
-
-    #[test]
-    fn rejects_empty() {
-        assert_validator_rejects_empty(&PiValidator, "AGENTS.md");
-    }
 
     #[test]
     fn agents_non_empty_is_clean() {

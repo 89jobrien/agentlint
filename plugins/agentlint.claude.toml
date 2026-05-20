@@ -74,7 +74,16 @@ field = "description"
 min = 20
 severity = "warning"
 difficulty = "painful"
-message = "agent description is too short"
+message = "agent description is too short — vague descriptions produce non-deterministic triggering"
+
+[[validator.rules]]
+id = "claude/agents/no-body-content"
+check = "min-content"
+min_lines = 2
+min_chars = 40
+severity = "warning"
+difficulty = "painful"
+message = "agent has little or no body content — under-specified agents produce variable behavior"
 
 # --- Skills (.claude/skills/**/SKILL.md) ---
 # Note: name format validation (kebab-case, dir match) remains in Rust.
@@ -124,6 +133,15 @@ max = 1024
 severity = "error"
 difficulty = "easy"
 message = "'description' exceeds 1024 characters"
+
+[[validator.rules]]
+id = "claude/skills/no-body-content"
+check = "min-content"
+min_lines = 3
+min_chars = 80
+severity = "warning"
+difficulty = "painful"
+message = "skill has little or no body content — under-specified skills produce variable behavior"
 
 # --- Commands (.claude/commands/**/*.md) ---
 

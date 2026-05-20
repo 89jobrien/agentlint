@@ -14,6 +14,3 @@ agentlint-frontmatter = { workspace = true }
 serde                 = { workspace = true }
 serde_json            = { workspace = true }
 serde_yaml            = { workspace = true }
-
-[dev-dependencies]
-agentlint-core = { workspace = true, features = ["test-utils"] }

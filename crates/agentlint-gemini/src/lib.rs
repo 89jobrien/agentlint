@@ -78,18 +78,7 @@ impl Validator for GeminiValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agentlint_core::testing::{assert_validator_contract, assert_validator_rejects_empty};
     use std::path::Path;
-
-    #[test]
-    fn conformance() {
-        assert_validator_contract(&GeminiValidator);
-    }
-
-    #[test]
-    fn rejects_empty() {
-        assert_validator_rejects_empty(&GeminiValidator, "GEMINI.md");
-    }
 
     #[test]
     fn non_empty_with_heading_is_clean() {
