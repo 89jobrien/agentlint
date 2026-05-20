@@ -461,13 +461,6 @@ mod tests {
 // ---------------------------------------------------------------------------
 // Property tests
 // ---------------------------------------------------------------------------
-// TODO(testing/property): extend proptests to cover:
-//   - trailing hyphen always errors
-//   - consecutive hyphens always error
-//   - uppercase chars always error
-//   - max_len constraint: values longer than max always produce a diagnostic
-//   - matches_dir_name: value != dirname always errors
-
 #[cfg(test)]
 mod proptests {
     use super::*;
@@ -495,6 +488,61 @@ mod proptests {
             let src = format!("---\nname: {s}\n---\n");
             let diags = validator.validate(Path::new("agent.md"), &src);
             prop_assert!(!diags.is_empty(), "expected error for leading-hyphen '{s}'");
+        }
+
+        #[test]
+        fn trailing_hyphen_always_errors(s in "[a-z][a-z0-9]*-") {
+            let validator = kebab_validator();
+            let src = format!("---\nname: {s}\n---\n");
+            let diags = validator.validate(Path::new("agent.md"), &src);
+            prop_assert!(!diags.is_empty(), "expected error for trailing-hyphen '{s}'");
+        }
+
+        #[test]
+        fn consecutive_hyphens_always_error(
+            prefix in "[a-z][a-z0-9]*",
+            suffix in "[a-z][a-z0-9]*",
+        ) {
+            let val = format!("{prefix}--{suffix}");
+            let validator = kebab_validator();
+            let src = format!("---\nname: {val}\n---\n");
+            let diags = validator.validate(Path::new("agent.md"), &src);
+            prop_assert!(!diags.is_empty(), "expected error for consecutive hyphens '{val}'");
+        }
+
+        #[test]
+        fn uppercase_chars_always_error(s in "[a-z]*[A-Z][a-zA-Z0-9-]*") {
+            let validator = kebab_validator();
+            let src = format!("---\nname: {s}\n---\n");
+            let diags = validator.validate(Path::new("agent.md"), &src);
+            prop_assert!(!diags.is_empty(), "expected error for uppercase in '{s}'");
+        }
+
+        #[test]
+        fn max_len_exceeded_always_errors(
+            val in "[a-z]{11,30}",
+        ) {
+            let validator = FrontmatterValidator::builder()
+                .required(FieldRule::new("name").max_len(10))
+                .build();
+            let src = format!("---\nname: {val}\n---\n");
+            let diags = validator.validate(Path::new("agent.md"), &src);
+            prop_assert!(!diags.is_empty(), "expected max_len error for '{val}' (len={})", val.len());
+        }
+
+        #[test]
+        fn matches_dir_name_mismatch_always_errors(
+            dir in "[a-z]{3,10}",
+            val in "[a-z]{3,10}",
+        ) {
+            prop_assume!(dir != val);
+            let validator = FrontmatterValidator::builder()
+                .required(FieldRule::new("name").matches_dir_name())
+                .build();
+            let src = format!("---\nname: {val}\n---\n");
+            let path_str = format!(".claude/agents/{dir}/agent.md");
+            let diags = validator.validate(Path::new(&path_str), &src);
+            prop_assert!(!diags.is_empty(), "expected dir mismatch error: dir={dir}, val={val}");
         }
     }
 }
