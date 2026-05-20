@@ -208,6 +208,29 @@ cargo nextest run --workspace
 cargo clippy --workspace -- -D warnings
 ```
 
+### Testing strategy
+
+Tests follow six dimensions, applied progressively:
+
+| Dimension   | Status  | Coverage                                 |
+| ----------- | ------- | ---------------------------------------- |
+| Unit        | Done    | 353 tests across all crates              |
+| Property    | Partial | `agentlint-frontmatter` kebab-case only  |
+| Fuzz        | Planned | Frontmatter parser, declarative parse    |
+| Conformance | Planned | `Validator` trait contract suite         |
+| Integration | Planned | End-to-end `run()` with temp directory   |
+| Regression  | Ongoing | Bug-fix commits include regression tests |
+
+**Property tests** use `proptest`. Run with `cargo nextest run --workspace`.
+Committed `proptest-regressions/` dirs contain found counterexamples -- never
+delete them.
+
+**Fuzz targets** (when added) live in `fuzz/fuzz_targets/` and run with
+`cargo fuzz run <target> -- -max_total_time=60`.
+
+**Conformance tests** verify every `Validator` impl against a shared contract
+suite in `agentlint-core`'s `testing` module.
+
 See [`docs/plans/2026-05-15-agentlint.md`](docs/plans/2026-05-15-agentlint.md) for the
 full design document and [`docs/roadmap.agentlint.md`](docs/roadmap.agentlint.md) for
 shipped milestones and planned work.

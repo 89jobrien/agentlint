@@ -1,4 +1,9 @@
 //! Parsed content abstraction and field access helpers.
+//!
+// TODO(testing/fuzz): add fuzz target for parse_frontmatter — it handles
+// untrusted string input with delimiter search and line splitting.
+// TODO(testing/property): add proptest for resolve_yaml_path and
+// resolve_json_path — dotted path resolution over nested structures.
 
 pub(crate) enum ParsedContent {
     YamlValue(serde_yaml::Value),

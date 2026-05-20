@@ -215,6 +215,16 @@ impl Diagnostic {
 // Validator trait
 // ---------------------------------------------------------------------------
 
+// TODO(testing/conformance): add a shared conformance test suite for
+// Validator impls. Every impl must satisfy:
+//   1. patterns() returns a non-empty slice
+//   2. validate("", empty_string) returns at least one diagnostic (or none
+//      if the validator explicitly allows empty files)
+//   3. validate() never panics on arbitrary UTF-8 input
+//   4. validate_batch([]) returns empty vec
+// Wire this via a `assert_validator_contract(v: &dyn Validator)` helper
+// in the `testing` module, called from each per-platform crate's tests.
+
 pub trait Validator: Send + Sync {
     /// File glob patterns this validator claims (e.g. `.claude/agents/**/*.md`).
     fn patterns(&self) -> &[&str];
@@ -335,6 +345,16 @@ pub fn run_on(
     }
 }
 
+// TODO(testing/integration): add an end-to-end integration test in
+// `tests/integration.rs` that creates a temp directory with files for
+// multiple platforms (Claude agent .md, Cursor .mdc, AGENTS.md, etc.),
+// calls `run()` with all validators, and asserts correct dispatch:
+//   - each file matched by the right validator
+//   - invalid files produce expected diagnostics
+//   - valid files produce zero diagnostics
+//   - binary files are silently skipped
+//   - read errors surface as Diagnostic::error entries
+
 /// Infrastructure convenience: walk `roots`, read each file, then delegate to
 /// [`run_on`]. Only files claimed by at least one validator are read; binary
 /// and unrecognised files are silently skipped. Read errors on claimed files
@@ -428,6 +448,11 @@ fn find_validators<'a>(
         .map(|v| v.as_ref())
         .collect()
 }
+
+// TODO(testing/property): add proptest for glob_match — the input space
+// (pattern × path) is large and the recursive matching logic is subtle.
+// Invariants: literal pattern matches only itself, `**` matches any depth,
+// `*` never crosses `/`.
 
 /// Minimal glob matching: supports `**`, `*`, and literal segments.
 fn glob_match(pattern: &str, path: &str) -> bool {

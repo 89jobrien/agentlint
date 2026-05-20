@@ -461,6 +461,12 @@ mod tests {
 // ---------------------------------------------------------------------------
 // Property tests
 // ---------------------------------------------------------------------------
+// TODO(testing/property): extend proptests to cover:
+//   - trailing hyphen always errors
+//   - consecutive hyphens always error
+//   - uppercase chars always error
+//   - max_len constraint: values longer than max always produce a diagnostic
+//   - matches_dir_name: value != dirname always errors
 
 #[cfg(test)]
 mod proptests {

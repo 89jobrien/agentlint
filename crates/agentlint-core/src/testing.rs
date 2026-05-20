@@ -114,6 +114,16 @@ pub fn assert_clean(diags: &[Diagnostic]) {
     );
 }
 
+// TODO(testing/conformance): add `assert_validator_contract(v: &dyn
+// Validator)` here. Each per-platform crate calls it in its own tests
+// to verify the Validator trait contract holds for every impl:
+//   1. v.patterns() is non-empty
+//   2. v.validate(dummy_path, "") does not panic
+//   3. v.validate_batch(&[]) returns empty vec
+//   4. v.validate(dummy_path, random_utf8) does not panic (basic fuzz)
+// Also add `assert_validator_rejects_empty(v, path)` for validators
+// that should flag empty files.
+
 fn fmt_diags(diags: &[Diagnostic]) -> String {
     if diags.is_empty() {
         return "  (none)".to_string();

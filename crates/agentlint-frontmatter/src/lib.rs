@@ -12,6 +12,11 @@
 //!
 //! Produces `Vec<Field>` with 1-indexed line numbers for accurate diagnostics.
 //! Parsing is line-based; nom is used for field extraction within each line.
+//!
+// TODO(testing/fuzz): add fuzz target for parse() — nom-based parser
+// handling arbitrary byte sequences. Target: no panics on any input.
+// TODO(testing/property): add proptest for parse round-trip — generating
+// valid frontmatter strings and verifying field extraction is lossless.
 
 pub mod builder;
 
