@@ -21,6 +21,9 @@ const BUILTIN_TOOLS: &[&str] = &[
 
 pub struct AgentsValidator;
 
+/// Minimum description length before a too-short warning fires.
+const MIN_DESCRIPTION_LEN: usize = 20;
+
 impl AgentsValidator {
     pub fn validate(path: &Path, src: &str) -> Vec<Diagnostic> {
         static VALIDATOR: OnceLock<FrontmatterValidator> = OnceLock::new();
@@ -55,14 +58,14 @@ impl AgentsValidator {
                             );
                         }
                     }
-                    "description" if field.value.len() < 20 => {
+                    "description" if field.value.len() < MIN_DESCRIPTION_LEN => {
                         diags.push(
                             Diagnostic::warning(
                                 path,
                                 field.line,
                                 1,
                                 format!(
-                                    "agent description is too short ({} chars, minimum 20)",
+                                    "agent description is too short ({} chars, minimum {MIN_DESCRIPTION_LEN})",
                                     field.value.len()
                                 ),
                             )

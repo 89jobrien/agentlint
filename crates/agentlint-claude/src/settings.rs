@@ -89,266 +89,13 @@ impl SettingsValidator {
 
         let mut diags = Vec::new();
 
-        // Unknown top-level keys.
-        for key in obj.keys() {
-            if !KNOWN_KEYS.contains(&key.as_str()) {
-                diags.push(
-                    Diagnostic::error(path, 1, 1, format!("unknown top-level key '{key}'"))
-                        .with_rule("claude/settings/unknown-key", Difficulty::Hard),
-                );
-            }
-        }
-
-        // skipDangerousModePermissionPrompt: true disables all permission prompts globally.
-        if obj
-            .get("skipDangerousModePermissionPrompt")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-        {
-            diags.push(
-                Diagnostic::warning(
-                    path,
-                    1,
-                    1,
-                    "skipDangerousModePermissionPrompt is true: all permission prompts are \
-                     disabled globally; consider scoping with permissions.allow instead",
-                )
-                .with_rule("claude/settings/skip-dangerous-mode", Difficulty::Hard),
-            );
-        }
-
-        // model key — validate against known Claude model IDs.
-        const KNOWN_MODELS: &[&str] = &[
-            // Full model IDs
-            "claude-opus-4-6",
-            "claude-sonnet-4-6",
-            "claude-haiku-4-5-20251001",
-            "claude-3-5-sonnet-20241022",
-            "claude-3-5-haiku-20241022",
-            "claude-3-opus-20240229",
-            "claude-3-sonnet-20240229",
-            "claude-3-haiku-20240307",
-            // Short aliases accepted by Claude Code
-            "opus",
-            "sonnet",
-            "haiku",
-            "inherit",
-        ];
-        if let Some(model) = obj.get("model").and_then(|v| v.as_str())
-            && !KNOWN_MODELS.contains(&model)
-        {
-            diags.push(
-                Diagnostic::warning(
-                    path,
-                    1,
-                    1,
-                    format!(
-                        "model '{model}' is not a known Claude model ID; \
-                         check for typos or update agentlint's known-models list"
-                    ),
-                )
-                .with_rule("claude/settings/unknown-model", Difficulty::Hard),
-            );
-        }
-
-        // Top-level env block — warn on any op:// URIs.
-        if let Some(env) = obj.get("env").and_then(|v| v.as_object()) {
-            for (key, val) in env {
-                if let Some(s) = val.as_str()
-                    && s.starts_with("op://")
-                {
-                    diags.push(
-                        Diagnostic::warning(
-                            path,
-                            1,
-                            1,
-                            format!(
-                                "env.{key}: op:// URI will not resolve in Claude's shell \
-                                 context; use 'apiKeyHelper' or pre-resolve the secret \
-                                 before launch"
-                            ),
-                        )
-                        .with_rule("claude/settings/env-unresolved-op-ref", Difficulty::Hard),
-                    );
-                }
-            }
-        }
-
-        // permissions.allow / permissions.deny must be arrays of strings.
-        if let Some(perms) = obj.get("permissions").and_then(|v| v.as_object()) {
-            for &field in &["allow", "deny"] {
-                if let Some(v) = perms.get(field)
-                    && !is_array_of_strings(v)
-                {
-                    diags.push(
-                        Diagnostic::error(
-                            path,
-                            1,
-                            1,
-                            format!("permissions.{field} must be an array of strings"),
-                        )
-                        .with_rule("claude/settings/invalid-permissions", Difficulty::Easy),
-                    );
-                }
-            }
-
-            // Inspect individual allow entries for dangerous patterns.
-            if let Some(allow) = perms.get("allow").and_then(|v| v.as_array()) {
-                for entry in allow {
-                    if let Some(s) = entry.as_str() {
-                        check_allow_entry(path, s, &mut diags);
-                    }
-                }
-            }
-        }
-
-        // hooks.<event> is an array of matcher groups: [{matcher, hooks: [{type, command}]}]
-        if let Some(hooks) = obj.get("hooks").and_then(|v| v.as_object()) {
-            for (event, entries) in hooks {
-                let Some(groups) = entries.as_array() else {
-                    continue;
-                };
-                for (gi, group) in groups.iter().enumerate() {
-                    let matcher = group
-                        .get("matcher")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("<no matcher>");
-
-                    let inner = match group.get("hooks").and_then(|v| v.as_array()) {
-                        Some(h) => h,
-                        None => {
-                            diags.push(
-                                Diagnostic::error(
-                                    path,
-                                    1,
-                                    1,
-                                    format!(
-                                        "hooks.{event}[{gi}] (matcher: {matcher:?}) \
-                                         must have a 'hooks' array"
-                                    ),
-                                )
-                                .with_rule(
-                                    "claude/settings/hook-missing-hooks-array",
-                                    Difficulty::Easy,
-                                ),
-                            );
-                            continue;
-                        }
-                    };
-
-                    // Structural check: each inner hook needs a command.
-                    for (hi, hook) in inner.iter().enumerate() {
-                        if hook.get("command").and_then(|v| v.as_str()).is_none() {
-                            diags.push(
-                                Diagnostic::error(
-                                    path,
-                                    1,
-                                    1,
-                                    format!(
-                                        "hooks.{event}[{gi}].hooks[{hi}] \
-                                         must have a 'command' string field"
-                                    ),
-                                )
-                                .with_rule(
-                                    "claude/settings/hook-missing-command",
-                                    Difficulty::Easy,
-                                ),
-                            );
-                        }
-                    }
-
-                    // Warn when a matcher has too many hooks (process spawn pressure).
-                    if inner.len() > MAX_HOOKS_PER_MATCHER {
-                        diags.push(
-                            Diagnostic::warning(
-                                path,
-                                1,
-                                1,
-                                format!(
-                                    "hooks.{event} matcher {matcher:?} has {} hooks \
-                                     (>{MAX_HOOKS_PER_MATCHER}); each spawns a subprocess — \
-                                     consider consolidating into a single binary",
-                                    inner.len()
-                                ),
-                            )
-                            .with_rule("claude/settings/too-many-hooks", Difficulty::Hard),
-                        );
-                    }
-
-                    // Check hook commands against warn/error pattern tables.
-                    for hook in inner {
-                        let cmd = hook.get("command").and_then(|v| v.as_str()).unwrap_or("");
-                        for (pattern, reason) in WARN_PATTERNS {
-                            if cmd.contains(pattern) {
-                                diags.push(
-                                    Diagnostic::warning(
-                                        path,
-                                        1,
-                                        1,
-                                        format!(
-                                            "hooks.{event} command contains '{pattern}': {reason}"
-                                        ),
-                                    )
-                                    .with_rule(
-                                        "claude/settings/expensive-hook-command",
-                                        Difficulty::Hard,
-                                    ),
-                                );
-                            }
-                        }
-                        for (pattern, reason) in ERROR_PATTERNS {
-                            if cmd.contains(pattern) {
-                                diags.push(
-                                    Diagnostic::error(
-                                        path,
-                                        1,
-                                        1,
-                                        format!(
-                                            "hooks.{event} command contains '{pattern}': {reason}"
-                                        ),
-                                    )
-                                    .with_rule("claude/settings/sleep-in-hook", Difficulty::Easy),
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // mcpServers duplicate names (raw scan — serde deduplicates silently).
-        for name in find_duplicate_server_names(src) {
-            diags.push(
-                Diagnostic::warning(
-                    path,
-                    1,
-                    1,
-                    format!(
-                        "mcpServers.{name}: duplicate server name; \
-                         the last entry silently wins — remove the duplicate"
-                    ),
-                )
-                .with_rule("claude/settings/mcp-duplicate-server", Difficulty::Hard),
-            );
-        }
-
-        // mcpServers entries — validate each server using the shared MCP helper.
-        if let Some(servers) = obj.get("mcpServers").and_then(|v| v.as_object()) {
-            for (name, entry) in servers {
-                match entry.as_object() {
-                    Some(server) => validate_server_entry(path, name, server, &mut diags),
-                    None => diags.push(
-                        Diagnostic::error(
-                            path,
-                            1,
-                            1,
-                            format!("mcpServers.{name}: server entry must be a JSON object"),
-                        )
-                        .with_rule("claude/mcp/invalid-server-entry", Difficulty::Easy),
-                    ),
-                }
-            }
-        }
+        validate_top_level_keys(path, obj, &mut diags);
+        validate_dangerous_mode(path, obj, &mut diags);
+        validate_model(path, obj, &mut diags);
+        validate_env(path, obj, &mut diags);
+        validate_permissions(path, obj, &mut diags);
+        validate_hooks(path, obj, &mut diags);
+        validate_mcp_servers(path, src, obj, &mut diags);
 
         // Deduplicate: for rules that fire per-entry (allow list, hook commands),
         // only keep the first occurrence of each rule ID per file.
@@ -361,6 +108,388 @@ impl SettingsValidator {
         });
 
         diags
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Extracted validation helpers
+// ---------------------------------------------------------------------------
+
+fn validate_top_level_keys(
+    path: &Path,
+    obj: &serde_json::Map<String, serde_json::Value>,
+    diags: &mut Vec<Diagnostic>,
+) {
+    for key in obj.keys() {
+        if !KNOWN_KEYS.contains(&key.as_str()) {
+            diags.push(
+                Diagnostic::error(path, 1, 1, format!("unknown top-level key '{key}'"))
+                    .with_rule("claude/settings/unknown-key", Difficulty::Hard),
+            );
+        }
+    }
+}
+
+fn validate_dangerous_mode(
+    path: &Path,
+    obj: &serde_json::Map<String, serde_json::Value>,
+    diags: &mut Vec<Diagnostic>,
+) {
+    if obj
+        .get("skipDangerousModePermissionPrompt")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        diags.push(
+            Diagnostic::warning(
+                path,
+                1,
+                1,
+                "skipDangerousModePermissionPrompt is true: all permission prompts are \
+                 disabled globally; consider scoping with permissions.allow instead",
+            )
+            .with_rule("claude/settings/skip-dangerous-mode", Difficulty::Hard),
+        );
+    }
+}
+
+/// Known Claude model IDs accepted by Claude Code.
+const KNOWN_MODELS: &[&str] = &[
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022",
+    "claude-3-opus-20240229",
+    "claude-3-sonnet-20240229",
+    "claude-3-haiku-20240307",
+    "opus",
+    "sonnet",
+    "haiku",
+    "inherit",
+];
+
+fn validate_model(
+    path: &Path,
+    obj: &serde_json::Map<String, serde_json::Value>,
+    diags: &mut Vec<Diagnostic>,
+) {
+    if let Some(model) = obj.get("model").and_then(|v| v.as_str())
+        && !KNOWN_MODELS.contains(&model)
+    {
+        diags.push(
+            Diagnostic::warning(
+                path,
+                1,
+                1,
+                format!(
+                    "model '{model}' is not a known Claude model ID; \
+                     check for typos or update agentlint's known-models list"
+                ),
+            )
+            .with_rule("claude/settings/unknown-model", Difficulty::Hard),
+        );
+    }
+}
+
+fn validate_env(
+    path: &Path,
+    obj: &serde_json::Map<String, serde_json::Value>,
+    diags: &mut Vec<Diagnostic>,
+) {
+    if let Some(env) = obj.get("env").and_then(|v| v.as_object()) {
+        for (key, val) in env {
+            if let Some(s) = val.as_str()
+                && s.starts_with("op://")
+            {
+                diags.push(
+                    Diagnostic::warning(
+                        path,
+                        1,
+                        1,
+                        format!(
+                            "env.{key}: op:// URI will not resolve in Claude's shell \
+                             context; use 'apiKeyHelper' or pre-resolve the secret \
+                             before launch"
+                        ),
+                    )
+                    .with_rule("claude/settings/env-unresolved-op-ref", Difficulty::Hard),
+                );
+            }
+        }
+    }
+}
+
+fn validate_permissions(
+    path: &Path,
+    obj: &serde_json::Map<String, serde_json::Value>,
+    diags: &mut Vec<Diagnostic>,
+) {
+    let Some(perms) = obj.get("permissions").and_then(|v| v.as_object()) else {
+        return;
+    };
+
+    for &field in &["allow", "deny"] {
+        if let Some(v) = perms.get(field)
+            && !is_array_of_strings(v)
+        {
+            diags.push(
+                Diagnostic::error(
+                    path,
+                    1,
+                    1,
+                    format!("permissions.{field} must be an array of strings"),
+                )
+                .with_rule("claude/settings/invalid-permissions", Difficulty::Easy),
+            );
+        }
+    }
+
+    if let Some(allow) = perms.get("allow").and_then(|v| v.as_array()) {
+        for entry in allow {
+            if let Some(s) = entry.as_str() {
+                check_allow_entry(path, s, diags);
+            }
+        }
+    }
+
+    if let Some(deny) = perms.get("deny").and_then(|v| v.as_array()) {
+        for entry in deny {
+            if let Some(s) = entry.as_str()
+                && (s == "Bash" || s == "Bash(*)" || s == "Bash(**)")
+            {
+                diags.push(
+                    Diagnostic::warning(
+                        path,
+                        1,
+                        1,
+                        "permissions.deny contains an unconstrained Bash deny; \
+                         this disables all shell execution — use scoped deny \
+                         patterns instead (e.g. `Bash(rm *:*)`)",
+                    )
+                    .with_rule("claude/settings/deny-all-bash", Difficulty::Hard),
+                );
+                break;
+            }
+        }
+    }
+
+    // Contradictory: same tool pattern in both allow and deny.
+    if let (Some(allow), Some(deny)) = (
+        perms.get("allow").and_then(|v| v.as_array()),
+        perms.get("deny").and_then(|v| v.as_array()),
+    ) {
+        for allow_entry in allow {
+            if let Some(a) = allow_entry.as_str() {
+                for deny_entry in deny {
+                    if let Some(d) = deny_entry.as_str()
+                        && a == d
+                    {
+                        diags.push(
+                            Diagnostic::warning(
+                                path,
+                                1,
+                                1,
+                                format!(
+                                    "permissions: '{a}' appears in both allow and \
+                                     deny; the effective behaviour is undefined — \
+                                     remove from one list"
+                                ),
+                            )
+                            .with_rule(
+                                "claude/settings/contradictory-permission",
+                                Difficulty::Hard,
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Known Claude Code hook event names.
+const KNOWN_HOOK_EVENTS: &[&str] = &[
+    "PreToolUse",
+    "PostToolUse",
+    "PreToolUseRejected",
+    "Stop",
+    "SubagentStop",
+    "SessionStart",
+    "SessionEnd",
+    "PreCompact",
+    "UserPromptSubmit",
+    "Notification",
+];
+
+fn validate_hooks(
+    path: &Path,
+    obj: &serde_json::Map<String, serde_json::Value>,
+    diags: &mut Vec<Diagnostic>,
+) {
+    let Some(hooks) = obj.get("hooks").and_then(|v| v.as_object()) else {
+        return;
+    };
+
+    for event in hooks.keys() {
+        if !KNOWN_HOOK_EVENTS.contains(&event.as_str()) {
+            diags.push(
+                Diagnostic::error(
+                    path,
+                    1,
+                    1,
+                    format!(
+                        "hooks.{event}: unknown hook event; known events are: {}",
+                        KNOWN_HOOK_EVENTS.join(", ")
+                    ),
+                )
+                .with_rule("claude/settings/unknown-hook-event", Difficulty::Easy),
+            );
+        }
+    }
+
+    for (event, entries) in hooks {
+        let Some(groups) = entries.as_array() else {
+            continue;
+        };
+        for (gi, group) in groups.iter().enumerate() {
+            validate_hook_group(path, event, gi, group, diags);
+        }
+    }
+}
+
+fn validate_hook_group(
+    path: &Path,
+    event: &str,
+    gi: usize,
+    group: &serde_json::Value,
+    diags: &mut Vec<Diagnostic>,
+) {
+    let matcher = group
+        .get("matcher")
+        .and_then(|v| v.as_str())
+        .unwrap_or("<no matcher>");
+
+    let inner = match group.get("hooks").and_then(|v| v.as_array()) {
+        Some(h) => h,
+        None => {
+            diags.push(
+                Diagnostic::error(
+                    path,
+                    1,
+                    1,
+                    format!(
+                        "hooks.{event}[{gi}] (matcher: {matcher:?}) \
+                         must have a 'hooks' array"
+                    ),
+                )
+                .with_rule("claude/settings/hook-missing-hooks-array", Difficulty::Easy),
+            );
+            return;
+        }
+    };
+
+    for (hi, hook) in inner.iter().enumerate() {
+        if hook.get("command").and_then(|v| v.as_str()).is_none() {
+            diags.push(
+                Diagnostic::error(
+                    path,
+                    1,
+                    1,
+                    format!(
+                        "hooks.{event}[{gi}].hooks[{hi}] \
+                         must have a 'command' string field"
+                    ),
+                )
+                .with_rule("claude/settings/hook-missing-command", Difficulty::Easy),
+            );
+        }
+    }
+
+    if inner.len() > MAX_HOOKS_PER_MATCHER {
+        diags.push(
+            Diagnostic::warning(
+                path,
+                1,
+                1,
+                format!(
+                    "hooks.{event} matcher {matcher:?} has {} hooks \
+                     (>{MAX_HOOKS_PER_MATCHER}); each spawns a subprocess — \
+                     consider consolidating into a single binary",
+                    inner.len()
+                ),
+            )
+            .with_rule("claude/settings/too-many-hooks", Difficulty::Hard),
+        );
+    }
+
+    for hook in inner {
+        let cmd = hook.get("command").and_then(|v| v.as_str()).unwrap_or("");
+        for (pattern, reason) in WARN_PATTERNS {
+            if cmd.contains(pattern) {
+                diags.push(
+                    Diagnostic::warning(
+                        path,
+                        1,
+                        1,
+                        format!("hooks.{event} command contains '{pattern}': {reason}"),
+                    )
+                    .with_rule("claude/settings/expensive-hook-command", Difficulty::Hard),
+                );
+            }
+        }
+        for (pattern, reason) in ERROR_PATTERNS {
+            if cmd.contains(pattern) {
+                diags.push(
+                    Diagnostic::error(
+                        path,
+                        1,
+                        1,
+                        format!("hooks.{event} command contains '{pattern}': {reason}"),
+                    )
+                    .with_rule("claude/settings/sleep-in-hook", Difficulty::Easy),
+                );
+            }
+        }
+    }
+}
+
+fn validate_mcp_servers(
+    path: &Path,
+    src: &str,
+    obj: &serde_json::Map<String, serde_json::Value>,
+    diags: &mut Vec<Diagnostic>,
+) {
+    for name in find_duplicate_server_names(src) {
+        diags.push(
+            Diagnostic::warning(
+                path,
+                1,
+                1,
+                format!(
+                    "mcpServers.{name}: duplicate server name; \
+                     the last entry silently wins — remove the duplicate"
+                ),
+            )
+            .with_rule("claude/settings/mcp-duplicate-server", Difficulty::Hard),
+        );
+    }
+
+    if let Some(servers) = obj.get("mcpServers").and_then(|v| v.as_object()) {
+        for (name, entry) in servers {
+            match entry.as_object() {
+                Some(server) => validate_server_entry(path, name, server, diags),
+                None => diags.push(
+                    Diagnostic::error(
+                        path,
+                        1,
+                        1,
+                        format!("mcpServers.{name}: server entry must be a JSON object"),
+                    )
+                    .with_rule("claude/mcp/invalid-server-entry", Difficulty::Easy),
+                ),
+            }
+        }
     }
 }
 
@@ -867,6 +996,101 @@ mod tests {
         let src = r#"{"mcpServers": {"s": {"args": ["foo"]}}}"#;
         let diags = SettingsValidator::validate(Path::new(PATH), src);
         assert_error_contains(&diags, "transport");
+    }
+
+    // --- deny-all-bash ---
+
+    #[test]
+    fn deny_bare_bash_is_warning() {
+        let src = r#"{"permissions": {"deny": ["Bash"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/deny-all-bash"
+                    && d.severity == agentlint_core::Severity::Warning),
+            "expected deny-all-bash warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn deny_scoped_bash_is_clean() {
+        let src = r#"{"permissions": {"deny": ["Bash(rm *:*)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/deny-all-bash"),
+            "scoped deny should not trigger"
+        );
+    }
+
+    // --- contradictory-permission ---
+
+    #[test]
+    fn contradictory_permission_warns() {
+        let src = r#"{"permissions": {"allow": ["Bash(git *:*)"], "deny": ["Bash(git *:*)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/contradictory-permission"
+                    && d.severity == agentlint_core::Severity::Warning),
+            "expected contradictory-permission warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn non_contradictory_permissions_clean() {
+        let src = r#"{"permissions": {"allow": ["Bash(git *:*)"], "deny": ["Bash(rm *:*)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/contradictory-permission"),
+            "different patterns should not trigger"
+        );
+    }
+
+    // --- unknown-hook-event ---
+
+    #[test]
+    fn unknown_hook_event_is_error() {
+        let src = r#"{"hooks": {"PreTooluse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "/bin/true"}]}]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/unknown-hook-event"
+                    && d.severity == agentlint_core::Severity::Error),
+            "expected unknown-hook-event error for 'PreTooluse', got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn known_hook_events_are_clean() {
+        for event in &[
+            "PreToolUse",
+            "PostToolUse",
+            "Stop",
+            "SubagentStop",
+            "SessionStart",
+            "SessionEnd",
+            "PreCompact",
+            "UserPromptSubmit",
+            "Notification",
+        ] {
+            let src = format!(
+                r#"{{"hooks": {{"{event}": [{{"matcher": "Bash", "hooks": [{{"type": "command", "command": "/bin/true"}}]}}]}}}}"#
+            );
+            let diags = SettingsValidator::validate(Path::new(PATH), &src);
+            assert!(
+                !diags
+                    .iter()
+                    .any(|d| d.rule == "claude/settings/unknown-hook-event"),
+                "event '{event}' should be accepted, got: {diags:?}"
+            );
+        }
     }
 
     #[test]

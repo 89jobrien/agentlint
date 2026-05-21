@@ -301,13 +301,24 @@ pub fn run_on(
         diagnostics.extend(validator.validate_batch(&claimed));
     }
 
+    let kept = apply_filters(diagnostics, config);
+
+    RunResult {
+        diagnostics: kept,
+        files_checked,
+        file_counts,
+    }
+}
+
+/// Apply difficulty, ignore, and override filters to a diagnostic list.
+fn apply_filters(mut diagnostics: Vec<Diagnostic>, config: &RunConfig) -> Vec<Diagnostic> {
     // 1. Difficulty filter — unclassified diagnostics (rule="") always show.
     diagnostics.retain(|d| d.rule.is_empty() || d.difficulty <= config.difficulty);
 
     // 2. Ignore filter — path suffix + rule match.
     diagnostics.retain(|d| {
         if d.rule.is_empty() {
-            return true; // unclassified always passes
+            return true;
         }
         let path_str = d.path.to_string_lossy();
         for entry in &config.ignores {
@@ -333,12 +344,7 @@ pub fn run_on(
         }
         kept.push(d);
     }
-
-    RunResult {
-        diagnostics: kept,
-        files_checked,
-        file_counts,
-    }
+    kept
 }
 
 // TODO(testing/integration): add an end-to-end integration test in

@@ -5,10 +5,13 @@ pub struct McpValidator;
 
 /// Returns `true` when `s` looks like a hardcoded secret.
 ///
-/// Heuristic: length > 20, no spaces, not starting with `$` (env var ref),
+/// Minimum string length before the plaintext-secret heuristic applies.
+const MIN_SECRET_LEN: usize = 20;
+
+/// Heuristic: length > MIN_SECRET_LEN, no spaces, not starting with `$` (env var ref),
 /// not an `op://` ref, and not all-lowercase (to avoid flagging path/name strings).
 pub(crate) fn looks_like_plaintext_secret(s: &str) -> bool {
-    if s.len() <= 20 {
+    if s.len() <= MIN_SECRET_LEN {
         return false;
     }
     if s.contains(' ') {
@@ -203,42 +206,7 @@ pub fn validate_server_entry(
         }
     }
 
-    if let Some(env) = server.get("env").and_then(|v| v.as_object()) {
-        for (key, val) in env {
-            if let Some(s) = val.as_str() {
-                if s.starts_with("op://") {
-                    diags.push(
-                        Diagnostic::warning(
-                            path,
-                            1,
-                            1,
-                            format!(
-                                "mcpServers.{name}.env.{key}: op:// URI will not \
-                                 resolve in Claude's shell context; use \
-                                 'apiKeyHelper' in settings.json or pre-resolve \
-                                 the secret before launch"
-                            ),
-                        )
-                        .with_rule("claude/mcp/op-uri-in-env", Difficulty::Hard),
-                    );
-                } else if looks_like_plaintext_secret(s) {
-                    diags.push(
-                        Diagnostic::error(
-                            path,
-                            1,
-                            1,
-                            format!(
-                                "mcpServers.{name}.env.{key}: value looks like a \
-                                 hardcoded secret; use an op:// ref or a \
-                                 $ENV_VAR reference instead"
-                            ),
-                        )
-                        .with_rule("claude/settings/mcp-plaintext-secret", Difficulty::Easy),
-                    );
-                }
-            }
-        }
-    }
+    validate_server_env(path, name, server, diags);
 
     for key in server.keys() {
         if !KNOWN_SERVER_KEYS.contains(&key.as_str()) {
@@ -250,6 +218,50 @@ pub fn validate_server_entry(
                     format!("mcpServers.{name}: unknown field '{key}'"),
                 )
                 .with_rule("claude/mcp/unknown-server-field", Difficulty::Painful),
+            );
+        }
+    }
+}
+
+fn validate_server_env(
+    path: &Path,
+    name: &str,
+    server: &serde_json::Map<String, serde_json::Value>,
+    diags: &mut Vec<Diagnostic>,
+) {
+    let Some(env) = server.get("env").and_then(|v| v.as_object()) else {
+        return;
+    };
+    for (key, val) in env {
+        let Some(s) = val.as_str() else { continue };
+        if s.starts_with("op://") {
+            diags.push(
+                Diagnostic::warning(
+                    path,
+                    1,
+                    1,
+                    format!(
+                        "mcpServers.{name}.env.{key}: op:// URI will not \
+                         resolve in Claude's shell context; use \
+                         'apiKeyHelper' in settings.json or pre-resolve \
+                         the secret before launch"
+                    ),
+                )
+                .with_rule("claude/mcp/op-uri-in-env", Difficulty::Hard),
+            );
+        } else if looks_like_plaintext_secret(s) {
+            diags.push(
+                Diagnostic::error(
+                    path,
+                    1,
+                    1,
+                    format!(
+                        "mcpServers.{name}.env.{key}: value looks like a \
+                         hardcoded secret; use an op:// ref or a \
+                         $ENV_VAR reference instead"
+                    ),
+                )
+                .with_rule("claude/settings/mcp-plaintext-secret", Difficulty::Easy),
             );
         }
     }

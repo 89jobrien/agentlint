@@ -101,71 +101,95 @@ impl Validator for CursorValidator {
             }
         }
 
-        // #40 — invalid globs
-        if let Some(globs_field) = fields.iter().find(|f| f.key == "globs") {
-            for segment in globs_field.value.split(',') {
-                let seg = segment.trim();
-                if seg.is_empty() {
-                    diags.push(
-                        Diagnostic::warning(
-                            path,
-                            globs_field.line,
-                            1,
-                            "invalid glob: empty segment in 'globs' field",
-                        )
-                        .with_rule("cursor/frontmatter/invalid-globs", Difficulty::Hard),
-                    );
-                    continue;
-                }
-                let open_brackets = seg.chars().filter(|&c| c == '[').count();
-                let close_brackets = seg.chars().filter(|&c| c == ']').count();
-                if open_brackets > close_brackets {
-                    diags.push(
-                        Diagnostic::warning(
-                            path,
-                            globs_field.line,
-                            1,
-                            format!("invalid glob '{seg}': unmatched '[' in 'globs' field"),
-                        )
-                        .with_rule("cursor/frontmatter/invalid-globs", Difficulty::Hard),
-                    );
-                }
-                // Check for invalid escape sequences: backslash not followed by a valid char
-                let chars: Vec<char> = seg.chars().collect();
-                let mut i = 0;
-                while i < chars.len() {
-                    if chars[i] == '\\' {
-                        let next = chars.get(i + 1).copied();
-                        match next {
-                            None | Some(' ') => {
-                                diags.push(
-                                    Diagnostic::warning(
-                                        path,
-                                        globs_field.line,
-                                        1,
-                                        format!(
-                                            "invalid glob '{seg}': invalid escape sequence in \
-                                             'globs' field"
-                                        ),
-                                    )
-                                    .with_rule(
-                                        "cursor/frontmatter/invalid-globs",
-                                        Difficulty::Hard,
-                                    ),
-                                );
-                                break;
-                            }
-                            _ => {
-                                i += 1; // skip escaped char
-                            }
-                        }
-                    }
-                    i += 1;
-                }
+        // alwaysApply must be a boolean value (true/false).
+        if let Some(field) = fields.iter().find(|f| f.key == "alwaysApply") {
+            let val = field.value.trim();
+            if !val.eq_ignore_ascii_case("true") && !val.eq_ignore_ascii_case("false") {
+                diags.push(
+                    Diagnostic::warning(
+                        path,
+                        field.line,
+                        1,
+                        format!(
+                            "alwaysApply value '{val}' is not a boolean; \
+                             Cursor only recognises `true` or `false` \
+                             (any other value is treated as false)"
+                        ),
+                    )
+                    .with_rule("cursor/frontmatter/invalid-always-apply", Difficulty::Easy),
+                );
             }
         }
 
+        // #40 — invalid globs
+        if let Some(globs_field) = fields.iter().find(|f| f.key == "globs") {
+            validate_globs(path, globs_field, &mut diags);
+        }
+
         diags
+    }
+}
+
+fn validate_globs(
+    path: &Path,
+    globs_field: &agentlint_frontmatter::Field,
+    diags: &mut Vec<Diagnostic>,
+) {
+    for segment in globs_field.value.split(',') {
+        let seg = segment.trim();
+        if seg.is_empty() {
+            diags.push(
+                Diagnostic::warning(
+                    path,
+                    globs_field.line,
+                    1,
+                    "invalid glob: empty segment in 'globs' field",
+                )
+                .with_rule("cursor/frontmatter/invalid-globs", Difficulty::Hard),
+            );
+            continue;
+        }
+        let open_brackets = seg.chars().filter(|&c| c == '[').count();
+        let close_brackets = seg.chars().filter(|&c| c == ']').count();
+        if open_brackets > close_brackets {
+            diags.push(
+                Diagnostic::warning(
+                    path,
+                    globs_field.line,
+                    1,
+                    format!("invalid glob '{seg}': unmatched '[' in 'globs' field"),
+                )
+                .with_rule("cursor/frontmatter/invalid-globs", Difficulty::Hard),
+            );
+        }
+        let chars: Vec<char> = seg.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            if chars[i] == '\\' {
+                let next = chars.get(i + 1).copied();
+                match next {
+                    None | Some(' ') => {
+                        diags.push(
+                            Diagnostic::warning(
+                                path,
+                                globs_field.line,
+                                1,
+                                format!(
+                                    "invalid glob '{seg}': invalid escape sequence in \
+                                     'globs' field"
+                                ),
+                            )
+                            .with_rule("cursor/frontmatter/invalid-globs", Difficulty::Hard),
+                        );
+                        break;
+                    }
+                    _ => {
+                        i += 1; // skip escaped char
+                    }
+                }
+            }
+            i += 1;
+        }
     }
 }
 
@@ -341,6 +365,80 @@ mod tests {
         assert!(
             diags.iter().any(|d| d.message.contains("foo")),
             "expected key name in message, got: {diags:?}"
+        );
+    }
+
+    // #invalid-always-apply
+
+    #[test]
+    fn always_apply_yes_is_warning() {
+        let src = "---\ndescription: ok\nglobs: **/*.rs\nalwaysApply: yes\n---\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "cursor/frontmatter/invalid-always-apply"),
+            "expected invalid-always-apply for 'yes', got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn always_apply_1_is_warning() {
+        let src = "---\ndescription: ok\nglobs: **/*.rs\nalwaysApply: 1\n---\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "cursor/frontmatter/invalid-always-apply"),
+            "expected invalid-always-apply for '1', got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn always_apply_empty_is_warning() {
+        let src = "---\ndescription: ok\nglobs: **/*.rs\nalwaysApply: \n---\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "cursor/frontmatter/invalid-always-apply"),
+            "expected invalid-always-apply for empty value, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn always_apply_true_is_clean() {
+        let src = "---\ndescription: ok\nglobs: **/*.rs\nalwaysApply: true\n---\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule == "cursor/frontmatter/invalid-always-apply"),
+            "true should be clean"
+        );
+    }
+
+    #[test]
+    fn always_apply_false_is_clean() {
+        let src = "---\ndescription: ok\nglobs: **/*.rs\nalwaysApply: false\n---\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule == "cursor/frontmatter/invalid-always-apply"),
+            "false should be clean"
+        );
+    }
+
+    #[test]
+    fn always_apply_TRUE_case_insensitive_is_clean() {
+        let src = "---\ndescription: ok\nglobs: **/*.rs\nalwaysApply: TRUE\n---\n";
+        let diags = v().validate(Path::new("rule.mdc"), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule == "cursor/frontmatter/invalid-always-apply"),
+            "TRUE should be clean (case-insensitive)"
         );
     }
 

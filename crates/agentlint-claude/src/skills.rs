@@ -4,6 +4,12 @@ use std::path::Path;
 
 pub struct SkillsValidator;
 
+/// Maximum length for a skill name field.
+const MAX_NAME_LEN: usize = 64;
+
+/// Maximum length for a skill description field.
+const MAX_DESCRIPTION_LEN: usize = 1024;
+
 impl SkillsValidator {
     pub fn validate(path: &Path, src: &str) -> Vec<Diagnostic> {
         // Only the SKILL.md entrypoint carries required frontmatter.
@@ -73,13 +79,16 @@ fn validate_name(path: &Path, fields: &[Field], diagnostics: &mut Vec<Diagnostic
 
     let name = &field.value;
 
-    if name.len() > 64 {
+    if name.len() > MAX_NAME_LEN {
         diagnostics.push(
             Diagnostic::error(
                 path,
                 field.line,
                 1,
-                format!("'name' exceeds 64 characters (got {})", name.len()),
+                format!(
+                    "'name' exceeds {MAX_NAME_LEN} characters (got {})",
+                    name.len()
+                ),
             )
             .with_rule("claude/skills/invalid-name", Difficulty::Easy),
         );
@@ -200,14 +209,14 @@ fn validate_description(path: &Path, fields: &[Field], diagnostics: &mut Vec<Dia
                 .with_rule("claude/skills/missing-description", Difficulty::Easy),
             );
         }
-        Some(f) if f.value.len() > 1024 => {
+        Some(f) if f.value.len() > MAX_DESCRIPTION_LEN => {
             diagnostics.push(
                 Diagnostic::error(
                     path,
                     f.line,
                     1,
                     format!(
-                        "'description' exceeds 1024 characters (got {})",
+                        "'description' exceeds {MAX_DESCRIPTION_LEN} characters (got {})",
                         f.value.len()
                     ),
                 )

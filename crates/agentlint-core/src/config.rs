@@ -22,6 +22,8 @@ impl std::fmt::Display for ConfigError {
     }
 }
 
+impl std::error::Error for ConfigError {}
+
 // ---------------------------------------------------------------------------
 // Raw TOML structs (internal)
 // ---------------------------------------------------------------------------
