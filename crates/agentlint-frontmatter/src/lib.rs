@@ -255,6 +255,34 @@ mod tests {
         assert!(fields.iter().any(|f| f.key == "description"));
     }
 
+    #[test]
+    fn parse_bare_block_indent_continuation() {
+        // YAML block scalar without `>` or `|` indicator — bare indented lines
+        // after an empty value should be concatenated as the field value.
+        let src = "---\nname: my-skill\ndescription:\n    This is a multi-line\n    description without scalar indicator\n---\nbody";
+        let fields = parse(src).unwrap();
+        let desc = fields.iter().find(|f| f.key == "description").unwrap();
+        assert!(
+            !desc.value.is_empty(),
+            "bare block-indent continuation must produce a non-empty value, got empty"
+        );
+        assert!(
+            desc.value.contains("multi-line"),
+            "continuation value should contain continuation text, got: {:?}",
+            desc.value
+        );
+    }
+
+    #[test]
+    fn check_required_bare_block_indent_is_not_empty() {
+        let src = "---\nname: my-skill\ndescription:\n    A description on the next line\n---\n";
+        let diags = check_required(Path::new("SKILL.md"), src, &["name", "description"]);
+        assert!(
+            diags.is_empty(),
+            "bare block-indent description should not trigger missing-description, got: {diags:?}"
+        );
+    }
+
     // --- check_required() ---
 
     #[test]

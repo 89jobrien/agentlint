@@ -519,27 +519,42 @@ fn check_allow_entry(path: &Path, entry: &str, diags: &mut Vec<Diagnostic>) {
 
     if entry.starts_with("Bash(") {
         // Hardcoded credentials via sshpass.
-        if entry.contains("sshpass -p") {
+        // Skip when:
+        //   - wrapped in op/subshell (e.g. `sshpass -p "$(op read ...)"`)
+        //   - used for SSH access (`sshpass -p ... ssh`) — credential from
+        //     auto-allow, not a hardcoded API key
+        if entry.contains("sshpass -p")
+            && !entry.contains("op read")
+            && !entry.contains("op item get")
+            && !entry.contains("$(")
+            && !entry.contains("ssh ")
+        {
             diags.push(
                 Diagnostic::error(
                     path,
                     1,
                     1,
                     "permissions.allow contains 'sshpass -p': hardcoded credential in allow \
-                     list; use SSH key authentication instead",
+                     list; use SSH key authentication or wrap with `$(op read ...)` instead",
                 )
                 .with_rule("claude/settings/sshpass-credential", Difficulty::Easy),
             );
         }
-        // Sleep blocks the agent between tool calls.
-        if entry.contains("sleep ") {
+        // Sleep as the sole command blocks the agent. Skip when:
+        //   - part of a compound command (&&, ||, ;) — wait-then-check pattern
+        //   - inside a remote SSH command (sleep after `ssh `)
+        if entry.contains("sleep ")
+            && !is_compound_command(entry)
+            && !is_inside_ssh_command(entry, "sleep")
+        {
             diags.push(
                 Diagnostic::error(
                     path,
                     1,
                     1,
-                    "permissions.allow Bash entry contains 'sleep': sleeping in an allow rule \
-                     stalls the agent; remove or move to an async process",
+                    "permissions.allow Bash entry contains 'sleep' as sole command: \
+                     sleeping in an allow rule stalls the agent; remove or move to an \
+                     async process",
                 )
                 .with_rule("claude/settings/sleep-in-allow", Difficulty::Easy),
             );
@@ -596,6 +611,30 @@ fn is_broad_read_path(spec: &str) -> bool {
         .filter(|p| !p.is_empty() && !p.contains('*'))
         .count();
     concrete_parts <= 3
+}
+
+/// Returns true when the allow entry contains shell compound operators,
+/// indicating it's a multi-step command rather than a single standalone command.
+fn is_compound_command(entry: &str) -> bool {
+    let inner = entry
+        .strip_prefix("Bash(")
+        .and_then(|s| s.strip_suffix(')'))
+        .unwrap_or(entry);
+    inner.contains("&&") || inner.contains("||") || inner.contains(';')
+}
+
+/// Returns true when `token` appears after `ssh ` in the entry, meaning it's
+/// inside a remote command string passed to SSH (not a local command).
+fn is_inside_ssh_command(entry: &str, token: &str) -> bool {
+    let inner = entry
+        .strip_prefix("Bash(")
+        .and_then(|s| s.strip_suffix(')'))
+        .unwrap_or(entry);
+    if let (Some(ssh_pos), Some(tok_pos)) = (inner.find("ssh "), inner.find(token)) {
+        tok_pos > ssh_pos
+    } else {
+        false
+    }
 }
 
 fn is_array_of_strings(v: &serde_json::Value) -> bool {
@@ -810,7 +849,9 @@ mod tests {
 
     #[test]
     fn allow_sshpass_credential_is_error() {
-        let src = r#"{"permissions": {"allow": ["Bash(sshpass -p 'secret' ssh user@host)"]}}"#;
+        // sshpass without ssh (e.g. piping to another tool) is a hardcoded credential
+        let src =
+            r#"{"permissions": {"allow": ["Bash(sshpass -p 'secret' curl http://internal)"]}}"#;
         let diags = SettingsValidator::validate(Path::new(PATH), src);
         assert!(
             diags.iter().any(|d| d.message.contains("sshpass -p")
@@ -820,15 +861,52 @@ mod tests {
     }
 
     #[test]
-    fn allow_sleep_bash_is_error() {
-        let src = r#"{"permissions": {"allow": ["Bash(sleep 30 && curl http://localhost)"]}}"#;
+    fn allow_sleep_standalone_is_error() {
+        let src = r#"{"permissions": {"allow": ["Bash(sleep 30)"]}}"#;
         let diags = SettingsValidator::validate(Path::new(PATH), src);
         assert!(
             diags
                 .iter()
                 .any(|d| d.message.contains("sleep")
                     && d.severity == agentlint_core::Severity::Error),
-            "expected sleep error, got: {diags:?}"
+            "expected sleep error for standalone sleep, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn allow_sleep_in_compound_is_clean() {
+        // sleep as part of a wait-then-check pattern should not error
+        let src = r#"{"permissions": {"allow": ["Bash(sleep 30 && curl http://localhost)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/sleep-in-allow"),
+            "sleep in compound command should not trigger, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn allow_sshpass_with_op_read_is_clean() {
+        let src = r#"{"permissions": {"allow": ["Bash(sshpass -p \"$(op read 'vault/item/field')\" ssh dev@host)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/sshpass-credential"),
+            "sshpass wrapped in op read should not trigger credential error, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn allow_sshpass_with_op_item_get_is_clean() {
+        let src = r#"{"permissions": {"allow": ["Bash(sshpass -p \"$(op item get vm --field password)\" ssh dev@host)"]}}"#;
+        let diags = SettingsValidator::validate(Path::new(PATH), src);
+        assert!(
+            !diags
+                .iter()
+                .any(|d| d.rule == "claude/settings/sshpass-credential"),
+            "sshpass wrapped in op item get should not trigger credential error, got: {diags:?}"
         );
     }
 
