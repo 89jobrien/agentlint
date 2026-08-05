@@ -2,7 +2,7 @@ use agentlint_core::config::load_config;
 use agentlint_core::{
     Difficulty, OutputFormat, RunConfig, Validator, format_gnu, format_json, format_pretty, run,
 };
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process;
@@ -44,6 +44,16 @@ struct Cli {
 }
 
 fn main() {
+    if std::env::args().any(|a| a == "--completions") {
+        clap_complete::generate(
+            clap_complete_nushell::Nushell,
+            &mut Cli::command(),
+            "agentlint",
+            &mut std::io::stdout(),
+        );
+        return;
+    }
+
     let cli = Cli::parse();
 
     let is_tty = std::io::stdout().is_terminal();

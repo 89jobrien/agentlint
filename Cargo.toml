@@ -73,6 +73,8 @@ agentlint-docs     = { workspace = true }
 agentlint-looprs   = { workspace = true }
 agentlint-plugins  = { workspace = true }
 clap               = { workspace = true }
+clap_complete      = "4"
+clap_complete_nushell = "4"
 serde_json         = { workspace = true }
 walkdir            = { workspace = true }
 
