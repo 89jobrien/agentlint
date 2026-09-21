@@ -3,7 +3,7 @@
 Linter for AI coding agent harness files. Validates agents, skills, commands, hooks, settings,
 MCP config, and docs frontmatter across the major coding agent platforms.
 
-```
+```text
 $ agentlint
 .claude/agents/debugger.md:1:1: error: missing required field 'name'
 .claude/commands/deploy.md:3:1: error: missing required field 'description'
@@ -38,13 +38,13 @@ $ agentlint
 
 ## Install
 
-```
+```text
 cargo install agentlint
 ```
 
 ## Usage
 
-```
+```text
 # Validate all agent harness files in the current directory
 agentlint
 
@@ -191,7 +191,7 @@ Or with cargo:
 
 Cargo workspace with a thin binary entry point and one library crate per platform:
 
-```
+```text
 agentlint/
   src/main.rs                # CLI wrapper — arg parsing, calls core runner
   crates/

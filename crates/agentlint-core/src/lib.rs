@@ -1,9 +1,15 @@
+//! Core diagnostics, validator contracts, filesystem runner, and output formatters.
+
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
+
+pub mod frontmatter;
 
 #[cfg(feature = "test-utils")]
 pub mod testing;
 
+#[cfg(feature = "declarative")]
+pub mod behavioral;
 #[cfg(feature = "config")]
 pub mod config;
 #[cfg(feature = "declarative")]
@@ -32,9 +38,7 @@ mod config_types {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Difficulty
-// ---------------------------------------------------------------------------
 
 /// Controls which rules fire. Rules at or below the configured difficulty are
 /// reported; rules above are silently suppressed.
@@ -83,9 +87,7 @@ impl std::str::FromStr for Difficulty {
     }
 }
 
-// ---------------------------------------------------------------------------
 // RunConfig
-// ---------------------------------------------------------------------------
 
 /// Configuration passed to the runner; controls filtering and output behaviour.
 #[derive(Debug, Clone)]
@@ -112,9 +114,7 @@ impl Default for RunConfig {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Diagnostic
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Severity {
@@ -146,6 +146,7 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
+    /// Creates an error diagnostic at the given source location.
     pub fn error(
         path: impl Into<PathBuf>,
         line: usize,
@@ -163,6 +164,7 @@ impl Diagnostic {
         }
     }
 
+    /// Creates a warning diagnostic at the given source location.
     pub fn warning(
         path: impl Into<PathBuf>,
         line: usize,
@@ -187,6 +189,7 @@ impl Diagnostic {
         self
     }
 
+    /// Formats this diagnostic as one GNU-style record.
     pub fn gnu_format(&self) -> String {
         if self.rule.is_empty() {
             format!(
@@ -211,9 +214,7 @@ impl Diagnostic {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Validator trait
-// ---------------------------------------------------------------------------
 
 pub trait Validator: Send + Sync {
     /// File glob patterns this validator claims (e.g. `.claude/agents/**/*.md`).
@@ -231,9 +232,19 @@ pub trait Validator: Send + Sync {
     }
 }
 
-// ---------------------------------------------------------------------------
+/// Cross-file validation that operates on batches of files.
+///
+/// Unlike per-file `Validator::validate`, batch checks receive all matched
+/// files at once and can detect cross-file issues (e.g. duplicate names).
+pub trait BatchCheck: Send + Sync {
+    /// File glob patterns this check claims.
+    fn patterns(&self) -> &[&str];
+
+    /// Validate across all matched files.
+    fn check(&self, files: &[(&Path, &str)]) -> Vec<Diagnostic>;
+}
+
 // Output format
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
@@ -242,9 +253,7 @@ pub enum OutputFormat {
     Pretty,
 }
 
-// ---------------------------------------------------------------------------
 // Runner
-// ---------------------------------------------------------------------------
 
 pub struct RunResult {
     pub diagnostics: Vec<Diagnostic>,
@@ -570,10 +579,9 @@ fn glob_match_inner(pat: &[u8], s: &[u8]) -> bool {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Output helpers
-// ---------------------------------------------------------------------------
 
+/// Formats diagnostics as newline-delimited GNU-style records.
 pub fn format_gnu(diagnostics: &[Diagnostic]) -> String {
     diagnostics
         .iter()
@@ -673,6 +681,7 @@ pub fn format_pretty(diagnostics: &[Diagnostic], color: bool) -> String {
     out
 }
 
+/// Serializes diagnostics as pretty-printed JSON.
 pub fn format_json(diagnostics: &[Diagnostic]) -> String {
     let entries: Vec<serde_json::Value> = diagnostics
         .iter()
@@ -691,9 +700,7 @@ pub fn format_json(diagnostics: &[Diagnostic]) -> String {
     serde_json::to_string_pretty(&entries).unwrap_or_else(|_| "[]".to_string())
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -754,9 +761,7 @@ mod tests {
         ));
     }
 
-    // ---------------------------------------------------------------------------
     // Filtering logic tests
-    // ---------------------------------------------------------------------------
 
     fn easy_error(path: &str, rule: &'static str) -> Diagnostic {
         Diagnostic::error(PathBuf::from(path), 1, 1, "msg").with_rule(rule, Difficulty::Easy)

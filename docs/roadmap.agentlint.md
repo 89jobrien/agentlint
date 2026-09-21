@@ -10,23 +10,23 @@ meta: |
   version: 0.1.0
 ---
 
-# agentlint roadmap
+## agentlint roadmap
 
 Tracks shipped milestones and planned work. Issues are on GitHub; this file captures the
 high-level narrative.
 
 ---
 
-## Shipped
+### Shipped
 
-### v0.1.0 — foundation
+#### v0.1.0 — foundation
 
 - Cargo workspace skeleton: `agentlint-core`, `agentlint-claude`, `agentlint-cursor`
 - `Diagnostic` type, `Validator` trait, glob-based file dispatch, runner
 - GNU (`path:line:col: severity: msg`) and JSON output formatters
 - `--format`, `--exit-zero`, `--version` flags
 
-### v0.2.0 — false-positive reduction pass
+#### v0.2.0 — false-positive reduction pass
 
 - Binary file skip
 - YAML quote stripping in frontmatter parser
@@ -36,20 +36,20 @@ high-level narrative.
 - Per-rule deduplication in settings validator
 - Pretty output format with TTY auto-detect
 
-### v0.3.0 — codex + opencode + mcp
+#### v0.3.0 — codex + opencode + mcp
 
 - `agentlint-codex`: `AGENTS.md` non-empty check
 - `agentlint-opencode`: `AGENTS.md` + `opencode.json` valid-JSON check
 - `agentlint-claude`: `.mcp.json` hardcoded-secret and transport validation
 
-### v0.4.0 — settings + cursor depth
+#### v0.4.0 — settings + cursor depth
 
 - `claude/settings/broad-bash-allow` (#47) — warn on bare `Bash` / `Bash(*)` allow entries
 - `cursor/frontmatter/never-fires` (#48) — warn when rule has no globs and `alwaysApply` unset
 - `cursor/frontmatter/unknown-key` (#49) — warn on unrecognised frontmatter keys
 - `codex/content/no-commands-section` (#50) — warn when `AGENTS.md` lacks a commands section
 
-### v0.4.1 — sentinel review fixes
+#### v0.4.1 — sentinel review fixes
 
 - `Bash(**)` added to broad-bash-allow gate
 - `alwaysApply` comparison made case-insensitive
@@ -57,7 +57,7 @@ high-level narrative.
 - `never-fires` gated to `.mdc`/`.md` only (not `.cursorrules`)
 - Message text alignment
 
-### v0.5.0 — gemini / pi / opencode structural parity
+#### v0.5.0 — gemini / pi / opencode structural parity
 
 - `gemini/content/no-heading`, `gemini/content/too-sparse`,
   `gemini/content/no-commands-section` (#51)
@@ -68,9 +68,9 @@ high-level narrative.
 
 ---
 
-## In progress / planned
+### In progress / planned
 
-### Code quality — quick wins (#54 – #57)
+#### Code quality — quick wins (#54 – #57)
 
 | Issue | Description                                                   |
 | ----- | ------------------------------------------------------------- |
@@ -81,7 +81,7 @@ high-level narrative.
 
 Resolves ~11 `cargo qual` findings; raises quality score from 87% toward 92%.
 
-### Refactoring — validator internals (#58 – #63)
+#### Refactoring — validator internals (#58 – #63)
 
 | Issue | Description                                                                 |
 | ----- | --------------------------------------------------------------------------- |
@@ -94,7 +94,7 @@ Resolves ~11 `cargo qual` findings; raises quality score from 87% toward 92%.
 
 Target: `cargo qual` score ≥ 95%, zero LONG_FN / COMPLEXITY findings.
 
-### New rules (backlog)
+#### New rules (backlog)
 
 These are identified gaps not yet assigned issues:
 
@@ -106,7 +106,7 @@ These are identified gaps not yet assigned issues:
 - **All platforms**: `--fix` mode for auto-repairable diagnostics (missing fields with safe
   defaults, trailing commas in globs)
 
-### Distribution
+#### Distribution
 
 - Publish to crates.io on each version tag (currently `publish = true`, CI gate needed)
 - Pre-built binaries via GitHub Releases (musl + Apple Silicon)
@@ -114,7 +114,7 @@ These are identified gaps not yet assigned issues:
 
 ---
 
-## Quality metrics
+### Quality metrics
 
 `cargo qual` was first run at v0.5.0. Earlier versions show test counts only.
 
@@ -128,7 +128,7 @@ These are identified gaps not yet assigned issues:
 | v0.5.0  |   257 |              87.2% |       38 | gemini/pi/opencode structural parity |
 | target  |     — |              ≥ 95% |     ≤ 10 | after #54–#63 land                   |
 
-### Findings breakdown (v0.5.0)
+#### Findings breakdown (v0.5.0)
 
 | Category                           |  Count | Issues                        |
 | ---------------------------------- | -----: | ----------------------------- |

@@ -6,43 +6,22 @@ version = 4
 name = "agentlint"
 version = "0.6.0"
 dependencies = [
- "agentlint-claude",
- "agentlint-codex",
  "agentlint-core",
- "agentlint-cursor",
  "agentlint-docs",
- "agentlint-gemini",
- "agentlint-looprs",
- "agentlint-opencode",
- "agentlint-pi",
  "agentlint-plugins",
  "clap",
+ "clap_complete",
+ "clap_complete_nushell",
  "serde_json",
  "tempfile",
  "walkdir",
 ]
 
 [[package]]
-name = "agentlint-claude"
-version = "0.6.0"
-dependencies = [
- "agentlint-core",
- "agentlint-frontmatter",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "agentlint-codex"
-version = "0.6.0"
-dependencies = [
- "agentlint-core",
-]
-
-[[package]]
 name = "agentlint-core"
 version = "0.6.0"
 dependencies = [
+ "nom",
  "proptest",
  "serde",
  "serde_json",
@@ -50,14 +29,6 @@ dependencies = [
  "tempfile",
  "toml",
  "walkdir",
-]
-
-[[package]]
-name = "agentlint-cursor"
-version = "0.6.0"
-dependencies = [
- "agentlint-core",
- "agentlint-frontmatter",
 ]
 
 [[package]]
@@ -80,39 +51,6 @@ dependencies = [
  "agentlint-core",
  "nom",
  "proptest",
-]
-
-[[package]]
-name = "agentlint-gemini"
-version = "0.6.0"
-dependencies = [
- "agentlint-core",
-]
-
-[[package]]
-name = "agentlint-looprs"
-version = "0.6.0"
-dependencies = [
- "agentlint-core",
- "agentlint-frontmatter",
- "serde",
- "serde_json",
- "serde_yaml",
-]
-
-[[package]]
-name = "agentlint-opencode"
-version = "0.6.0"
-dependencies = [
- "agentlint-core",
- "serde_json",
-]
-
-[[package]]
-name = "agentlint-pi"
-version = "0.6.0"
-dependencies = [
- "agentlint-core",
 ]
 
 [[package]]
@@ -270,6 +208,25 @@ dependencies = [
  "anstyle",
  "clap_lex",
  "strsim",
+]
+
+[[package]]
+name = "clap_complete"
+version = "4.6.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f84a88507dbd05c695f2cb5e8558e747179134005e9893882dec964190ed89"
+dependencies = [
+ "clap",
+]
+
+[[package]]
+name = "clap_complete_nushell"
+version = "4.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "933b05d5d83ff65fd7eaf5d106c792f2264908790a2642aca57429767b762ce2"
+dependencies = [
+ "clap",
+ "clap_complete",
 ]
 
 [[package]]

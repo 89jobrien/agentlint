@@ -1,3 +1,5 @@
+//! Command-line interface for running agentlint validators.
+
 use agentlint_core::config::load_config;
 use agentlint_core::{
     Difficulty, OutputFormat, RunConfig, Validator, format_gnu, format_json, format_pretty, run,
@@ -117,21 +119,17 @@ fn main() {
     docs_validator.set_infer_mode(infer);
 
     // Rust-native validators (behavioral rules not expressible declaratively).
+    use agentlint_core::behavioral::{claude, cursor, looprs};
     let mut validators: Vec<Box<dyn Validator>> = vec![
-        Box::new(agentlint_claude::ClaudeValidator),
-        Box::new(agentlint_cursor::CursorValidator),
-        Box::new(agentlint_codex::CodexValidator),
-        Box::new(agentlint_opencode::AgentsMarkdownValidator),
-        Box::new(agentlint_opencode::OpenCodeJsonValidator),
-        Box::new(agentlint_gemini::GeminiValidator),
-        Box::new(agentlint_pi::PiValidator),
-        Box::new(agentlint_looprs::CommandsValidator),
-        Box::new(agentlint_looprs::HooksValidator),
-        Box::new(agentlint_looprs::SkillsValidator),
-        Box::new(agentlint_looprs::AgentsValidator),
-        Box::new(agentlint_looprs::RulesValidator),
-        Box::new(agentlint_looprs::ConfigValidator),
-        Box::new(agentlint_looprs::AgentJsonValidator),
+        Box::new(claude::ClaudeValidator),
+        Box::new(cursor::CursorValidator),
+        Box::new(looprs::CommandsValidator),
+        Box::new(looprs::HooksValidator),
+        Box::new(looprs::SkillsValidator),
+        Box::new(looprs::AgentsValidator),
+        Box::new(looprs::RulesValidator),
+        Box::new(looprs::ConfigValidator),
+        Box::new(looprs::AgentJsonValidator),
         Box::new(docs_validator),
     ];
 

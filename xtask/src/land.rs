@@ -10,6 +10,7 @@
 use anyhow::{Context, Result, bail};
 use xshell::{Shell, cmd};
 
+/// Rebases a feature branch onto `origin/main`, runs CI, and pushes it.
 pub fn land(sh: &Shell) -> Result<()> {
     // 1a. Guard: refuse if a rebase is already in progress.
     let git_dir_rel = cmd!(sh, "git rev-parse --git-dir")

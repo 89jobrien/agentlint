@@ -26,7 +26,7 @@ bug).
 
 **Data flow**:
 
-```
+```text
 src (raw &str)
   │
   ▼
@@ -102,7 +102,7 @@ to a `Diagnostic` using `OpenCodeError::severity()` and `::message()`.
 Sourced from `packages/opencode/src/config/config.ts` in the `sst/opencode` repo
 (`Schema.Struct` definition, commit pinned in code comment):
 
-```
+```text
 $schema, shell, logLevel, server, command, skills, reference, watcher,
 snapshot, plugin, share, autoshare, autoupdate, disabled_providers,
 enabled_providers, model, small_model, default_agent, username, mode,

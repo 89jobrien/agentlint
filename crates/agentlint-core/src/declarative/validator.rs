@@ -22,6 +22,7 @@ pub struct DeclarativeValidator {
 }
 
 impl DeclarativeValidator {
+    /// Builds a validator from a parsed definition and resolves its constant references.
     pub fn new(def: ValidatorDef, constants: &HashMap<String, toml::Value>) -> Self {
         let patterns: Vec<&'static str> = def
             .patterns

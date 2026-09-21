@@ -16,7 +16,7 @@ This is the engine behind `agentlint-plugins` and external plugin loading.
 
 ## Data flow
 
-```
+```text
 TOML plugin file
   → load_plugin_str() → PluginFile { meta, validators[] }
   → DeclarativeValidator::new(def, constants)

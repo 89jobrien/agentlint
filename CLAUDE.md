@@ -16,36 +16,45 @@ cargo nextest run --workspace -E 'test(test_name)'
 
 ## Architecture
 
-Cargo workspace with a thin binary entry point and one library crate per agent platform:
+Cargo workspace with a thin binary entry point and **only 4 crates**. Agent support is split
+across two very different mechanisms — this split is the most important fact about the codebase:
 
-```
+- **Rust behavioral modules** (compiled in): Claude Code, Cursor, and Looprs get hand-written
+  validators as Rust modules under `agentlint-core/src/behavioral/`.
+- **Declarative TOML plugins**: Codex, OpenCode, Gemini, Pi, and Maestro-docs are _not_ Rust code
+  at all — they're TOML rule files in the top-level `plugins/` directory, interpreted by the
+  declarative plugin engine in `agentlint-plugins`.
+
+```text
 agentlint/
-  src/main.rs                # thin CLI wrapper — arg parsing, calls core runner
+  src/main.rs                     # thin CLI wrapper — arg parsing, calls core runner
   crates/
-    agentlint-core/          # Diagnostic type, Validator trait, discovery, formatters,
-                             #   runner, declarative plugin engine
-    agentlint-frontmatter/   # Shared YAML frontmatter parser (nom-based)
-    agentlint-claude/        # Claude Code: agents, skills, commands, hooks, settings
-    agentlint-cursor/        # Cursor: .cursor/rules/**/*.mdc|.md, .cursorrules
-    agentlint-codex/         # Codex: AGENTS.md
-    agentlint-opencode/      # OpenCode: AGENTS.md, opencode.json
-    agentlint-gemini/        # Gemini: GEMINI.md
-    agentlint-pi/            # Pi: AGENTS.md, SYSTEM.md
-    agentlint-looprs/        # Looprs: commands, hooks, skills YAML validation
-    agentlint-docs/          # Docs: frontmatter schema validation, --infer-schema,
-                             #   --emit-schema, SchemaRegistry
-    agentlint-plugins/       # Embedded declarative TOML plugin definitions
-  plugins/                   # TOML plugin files (compiled into the binary)
+    agentlint-core/                # Diagnostic type, Validator trait, discovery, formatters,
+                                   #   runner, declarative plugin engine, and:
+      src/behavioral/
+        claude/                    # Claude Code: agents.rs, skills.rs, commands.rs, hooks.rs,
+                                   #   settings.rs, mcp.rs, meta.rs
+        cursor/                    # Cursor: .cursor/rules/**/*.mdc|.md, .cursorrules
+        looprs/                    # Looprs: commands, hooks, skills YAML validation
+    agentlint-frontmatter/         # Shared YAML frontmatter parser (nom-based)
+    agentlint-docs/                # Docs: frontmatter schema validation, --infer-schema,
+                                   #   --emit-schema, SchemaRegistry
+    agentlint-plugins/             # Declarative TOML plugin engine (embeds/loads plugins/*.toml)
+  plugins/                         # TOML plugin definitions, one per declarative agent:
+                                   #   agentlint.codex.toml, .opencode.toml, .gemini.toml,
+                                   #   .pi.toml, .maestro-docs.toml, plus .claude.toml and
+                                   #   .cursor.toml (declarative supplements to the Rust modules)
 ```
 
 ### Core abstractions (`agentlint-core`)
 
 - `Diagnostic { path, line, col, message, severity }` — the single output unit; severity is
   `Error` or `Warning`
-- `Validator` trait: `fn validate(path: &Path, src: &str) -> Vec<Diagnostic>` — each per-agent
-  crate implements this; validators accumulate all errors rather than fail-fast
-- Runner: walks cwd (or explicit paths), pattern-matches files to the correct validator, collects
-  diagnostics
+- `Validator` trait: `fn validate(path: &Path, src: &str) -> Vec<Diagnostic>` — each behavioral
+  module and the plugin engine implements this; validators accumulate all errors rather than
+  fail-fast
+- Runner: walks cwd (or explicit paths), pattern-matches files to the correct validator (Rust
+  module or TOML plugin), collects diagnostics
 - Output: GNU format (`path:line:col: error: msg`) or JSON via `--format json`
 
 ### Frontmatter parser (`agentlint-frontmatter`)
@@ -56,20 +65,19 @@ Grammar: `"---" newline field* "---" newline body`. Produces
 declarative required-field rules. Validation is a separate layer on top of the parse
 output so line numbers in diagnostics are accurate.
 
-### Per-agent crate structure
+### Claude Code behavioral sub-modules
 
-Each per-agent crate:
+`agentlint-core/src/behavioral/claude/` is split into seven sub-modules: `agents`, `skills`,
+`commands`, `hooks`, `settings`, `mcp`, `meta`. Agents/skills/commands share the nom frontmatter
+parser and require `name` and `description` fields. Hooks check shebang + execute bit. Settings
+uses `serde_json` and validates known top-level keys. `mcp` validates MCP server config; `meta`
+covers cross-cutting/meta-level checks.
 
-1. Declares which file patterns it owns (used by core for dispatch)
-2. Implements `Validator` from `agentlint-core`
-3. Uses `nom` for frontmatter (Claude, Cursor) or `serde_json` / line-based checks elsewhere
+### Declarative plugins (`agentlint-plugins` + `plugins/`)
 
-### Claude Code validator sub-modules
-
-`agentlint-claude` is split into five sub-modules: `agents`, `skills`, `commands`, `hooks`,
-`settings`. Agents/skills/commands share the nom frontmatter parser and both require `name` and
-`description` fields. Hooks check shebang + execute bit. Settings uses `serde_json` and validates
-known top-level keys.
+Codex, OpenCode, Gemini, Pi, and Maestro-docs have no Rust validator — their rules live entirely
+as TOML in `plugins/*.toml` and are interpreted at runtime by the engine in `agentlint-plugins`.
+Adding support for a new simple agent format means writing a TOML file, not a crate.
 
 ## Key dependencies
 

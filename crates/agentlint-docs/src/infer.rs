@@ -1,3 +1,5 @@
+//! Infers documentation schemas from existing Markdown frontmatter.
+
 use crate::{DocsSchema, FilenameConvention};
 use agentlint_frontmatter::parse;
 use std::collections::{HashMap, HashSet};
@@ -135,9 +137,7 @@ pub(crate) fn is_valid_date(s: &str) -> bool {
     year >= 2000 && (1..=12).contains(&month) && (1..=31).contains(&day)
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

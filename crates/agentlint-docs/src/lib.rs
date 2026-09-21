@@ -1,3 +1,5 @@
+//! Schema-driven validation and inference for Markdown documentation.
+
 use agentlint_core::{Diagnostic, Difficulty, Validator};
 use agentlint_frontmatter::{ParseError, parse};
 use serde::{Deserialize, Serialize};
@@ -12,9 +14,7 @@ pub use registry::SchemaRegistry;
 
 use plugin::BUILTIN_SRC;
 
-// ---------------------------------------------------------------------------
 // FilenameConvention — configurable naming format
-// ---------------------------------------------------------------------------
 
 /// A single filename convention entry.
 ///
@@ -145,9 +145,7 @@ fn match_template_inner(
     }
 }
 
-// ---------------------------------------------------------------------------
 // DocsSchema — configurable schema for docs frontmatter validation
-// ---------------------------------------------------------------------------
 
 /// Schema that drives `DocsValidator`. All fields have sensible defaults and
 /// can be overridden via the `[docs]` section of `.agentlint.toml`.
@@ -307,9 +305,7 @@ impl DocsSchema {
     }
 }
 
-// ---------------------------------------------------------------------------
 // DocsValidator
-// ---------------------------------------------------------------------------
 
 pub struct DocsValidator {
     schema: DocsSchema,
@@ -322,6 +318,7 @@ pub struct DocsValidator {
 }
 
 impl DocsValidator {
+    /// Creates a validator for the supplied documentation schema.
     pub fn new(schema: DocsSchema) -> Self {
         let glob: &'static str = Box::leak(schema.file_glob.clone().into_boxed_str());
         Self {
@@ -331,6 +328,7 @@ impl DocsValidator {
         }
     }
 
+    /// Enables or disables corpus-based schema inference during batch validation.
     pub fn set_infer_mode(&mut self, on: bool) {
         self.infer_mode = on;
     }
@@ -342,9 +340,7 @@ impl Default for DocsValidator {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Filename parsing
-// ---------------------------------------------------------------------------
 
 /// Tokens extracted from a filename by matching against a convention.
 type TokenMap = std::collections::HashMap<String, String>;
@@ -406,25 +402,19 @@ fn extract_ref_prefix(s: &str) -> &str {
     ""
 }
 
-// ---------------------------------------------------------------------------
 // Date validation
-// ---------------------------------------------------------------------------
 
 fn is_valid_date(s: &str) -> bool {
     infer::is_valid_date(s)
 }
 
-// ---------------------------------------------------------------------------
 // Rule ID helpers — map field name to a stable rule string
-// ---------------------------------------------------------------------------
 
 fn missing_field_rule(key: &str) -> String {
     format!("docs/frontmatter/missing-{key}")
 }
 
-// ---------------------------------------------------------------------------
 // Validator impl
-// ---------------------------------------------------------------------------
 
 impl Validator for DocsValidator {
     fn patterns(&self) -> &[&str] {
@@ -581,7 +571,7 @@ impl Validator for DocsValidator {
 
         // Cross-field validation: tokens that correspond to frontmatter fields
         // must match the frontmatter values.
-        //
+
         // Known field-mapped tokens: doctype, project, status.
         // title is derived as "{topic}-{doctype}" or "{project}-{doctype}".
         if let Some((_conv, tokens)) = &convention_match {
@@ -654,7 +644,7 @@ impl Validator for DocsValidator {
         }
 
         // meta: if present, must be a non-empty YAML mapping.
-        //
+
         // The frontmatter parser strips indentation from continuation lines,
         // so YAML block scalar indicators (`|`, `>`) need special handling:
         // strip the indicator and parse the remaining lines directly.
@@ -729,9 +719,7 @@ impl Validator for DocsValidator {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

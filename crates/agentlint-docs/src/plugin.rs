@@ -1,3 +1,5 @@
+//! Schema providers for built-in and filesystem-backed documentation schemas.
+
 use crate::DocsSchema;
 use std::path::PathBuf;
 
@@ -5,7 +7,9 @@ pub(crate) const BUILTIN_SRC: &str = include_str!("../schemas/agentlint-default.
 
 /// A named schema provider that resolves to a [`DocsSchema`].
 pub trait DocsSchemaPlugin: Send + Sync {
+    /// Returns the schema provider's registry name.
     fn name(&self) -> &str;
+    /// Loads and parses the provider's schema.
     fn load(&self) -> Result<DocsSchema, String>;
 }
 
@@ -33,6 +37,7 @@ pub struct FileJsonPlugin {
 }
 
 impl FileJsonPlugin {
+    /// Creates a file-backed plugin named after the JSON file stem.
     pub fn new(path: impl Into<PathBuf>) -> Self {
         let path = path.into();
         let name = path
@@ -57,9 +62,7 @@ impl DocsSchemaPlugin for FileJsonPlugin {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

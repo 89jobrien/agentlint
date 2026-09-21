@@ -8,6 +8,7 @@ use xshell::{Shell, cmd};
 
 use crate::utils::parse_workspace_version;
 
+/// Bumps, commits, tags, pushes, and creates a GitHub release.
 pub fn release(sh: &Shell, root: &Path, level: &str) -> Result<()> {
     // 1. Bump workspace version.
     crate::bump::bump(root, level)?;

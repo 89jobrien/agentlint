@@ -19,7 +19,7 @@ GNU-style or JSON diagnostics.
 
 ### Workspace layout
 
-```
+```text
 agentlint/                        # ~/dev/agentlint
   Cargo.toml                      # workspace manifest
   crates/
@@ -180,7 +180,7 @@ Hard error: file is empty or whitespace-only.
 
 ## nom parser design (Claude Code + Cursor)
 
-```
+```text
 frontmatter  = "---" newline field* "---" newline body
 field        = key ":" ws value newline
              | key ":" newline indent value newline  (multiline)
@@ -198,7 +198,7 @@ and emits `Diagnostic`s with accurate line numbers from the parse output.
 
 ## CLI interface
 
-```
+```text
 # Auto-discover from cwd
 agentlint
 

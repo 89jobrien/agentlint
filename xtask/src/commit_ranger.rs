@@ -16,6 +16,7 @@ use xshell::{Shell, cmd};
 // Note: SHA-256 repos use a 64-char zero OID — not supported here.
 const ZERO_OID: &str = "0000000000000000000000000000000000000000";
 
+/// Prints pushed commit ranges from stdin and runs the rustqual pre-push gate.
 pub fn run(sh: &Shell) -> Result<()> {
     let stdin = io::stdin();
     let mut has_refs = false;

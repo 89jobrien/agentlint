@@ -22,7 +22,7 @@ Two conventions are supported, selected by the file's location:
 
 Bound to a project. The `doctype` is explicit in the filename.
 
-```
+```text
 docs/roadmap.agentlint.md   → doctype=roadmap, stub=agentlint, id=agentlint-roadmap
 docs/architecture.agentlint.md
 ```
@@ -37,7 +37,7 @@ Scoped to a topic or ticket. Directory provides an additional path-inference fal
 | `docs/specs/` | `spec`                            |
 | `docs/plans/` | `plan`                            |
 
-```
+```text
 docs/ideas/20260516-agentlint-docs.idea.md  → doctype=idea, topic=agentlint-docs
 docs/specs/20260516-agentlint-docs.spec.md  → doctype=spec, topic=agentlint-docs
 docs/plans/20260516-agentlint-docs.plan.md  → doctype=plan, topic=agentlint-docs
@@ -110,7 +110,7 @@ present and non-empty when supplied, but does not validate internal keys. This a
 
 ### New crate: `agentlint-docs`
 
-```
+```text
 crates/agentlint-docs/
   Cargo.toml
   src/

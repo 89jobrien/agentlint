@@ -7,6 +7,7 @@ use std::{fs, path::Path};
 
 use crate::utils::{parse_semver, parse_workspace_version};
 
+/// Bumps the workspace package version by the requested semantic version level.
 pub fn bump(root: &Path, level: &str) -> Result<()> {
     let manifest = root.join("Cargo.toml");
     let content = fs::read_to_string(&manifest)?;

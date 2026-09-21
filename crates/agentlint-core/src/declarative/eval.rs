@@ -209,6 +209,17 @@ impl DeclarativeValidator {
                     ));
                 }
             }
+            Check::Custom => {
+                let fn_name = rule.custom_fn.as_deref()?;
+                if let Some(func) = crate::behavioral::registry().get(fn_name) {
+                    let fields = match parsed {
+                        ParsedContent::Fields(f) => f.clone(),
+                        _ => vec![],
+                    };
+                    let mut results = func(path, src, &fields);
+                    return results.pop();
+                }
+            }
             Check::ArrayNonEmpty => {
                 let field = rule.field.as_deref()?;
                 match parsed {

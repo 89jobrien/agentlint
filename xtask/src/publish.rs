@@ -1,19 +1,15 @@
 //! Publish crates to crates.io in dependency order with staggered delays.
 //!
 //! crates.io rate-limits new crate registrations to roughly one per minute.
-//! Every publish is followed by a configurable delay (default: 90 s) so the
+//! Every publish is followed by a configurable delay (default: 20 s) so the
 //! registry has time to index the crate before dependents are uploaded.
 //!
 //! Publish order (each line is one crate, published sequentially):
 //!   1. agentlint-core          — no workspace deps
 //!   2. agentlint-frontmatter   — depends on core
-//!   3. agentlint-claude        — depends on core + frontmatter
-//!   4. agentlint-cursor        — depends on core + frontmatter
-//!   5. agentlint-codex         — depends on core
-//!   6. agentlint-gemini        — depends on core
-//!   7. agentlint-pi            — depends on core
-//!   8. agentlint-opencode      — depends on core
-//!   9. agentlint               — depends on all of the above
+//!   3. agentlint-docs          — depends on core + frontmatter
+//!   4. agentlint-plugins       — depends on core
+//!   5. agentlint               — depends on all of the above
 
 use anyhow::{Context, Result};
 use std::path::Path;
@@ -28,12 +24,8 @@ const STAGGER_SECS: u64 = 20;
 const PUBLISH_ORDER: &[&str] = &[
     "agentlint-core",
     "agentlint-frontmatter",
-    "agentlint-claude",
-    "agentlint-cursor",
-    "agentlint-codex",
-    "agentlint-gemini",
-    "agentlint-pi",
-    "agentlint-opencode",
+    "agentlint-docs",
+    "agentlint-plugins",
     "agentlint",
 ];
 

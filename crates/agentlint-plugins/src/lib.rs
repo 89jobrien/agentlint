@@ -7,23 +7,7 @@ use agentlint_core::Validator;
 use agentlint_core::declarative::{load_plugin_validators, validators_from_str};
 use std::path::Path;
 
-const CLAUDE_TOML: &str = include_str!("../../../plugins/agentlint.claude.toml");
-const CURSOR_TOML: &str = include_str!("../../../plugins/agentlint.cursor.toml");
-const CODEX_TOML: &str = include_str!("../../../plugins/agentlint.codex.toml");
-const GEMINI_TOML: &str = include_str!("../../../plugins/agentlint.gemini.toml");
-const OPENCODE_TOML: &str = include_str!("../../../plugins/agentlint.opencode.toml");
-const PI_TOML: &str = include_str!("../../../plugins/agentlint.pi.toml");
-const LOOPRS_TOML: &str = include_str!("../../../plugins/agentlint.looprs.toml");
-
-static BUILTIN_PLUGINS: &[(&str, &str)] = &[
-    ("claude", CLAUDE_TOML),
-    ("cursor", CURSOR_TOML),
-    ("codex", CODEX_TOML),
-    ("gemini", GEMINI_TOML),
-    ("opencode", OPENCODE_TOML),
-    ("pi", PI_TOML),
-    ("looprs", LOOPRS_TOML),
-];
+include!(concat!(env!("OUT_DIR"), "/builtin_plugins.rs"));
 
 /// Parse and return validators from all embedded plugin definitions.
 ///

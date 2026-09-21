@@ -1,3 +1,5 @@
+//! Registry and discovery for documentation schema providers.
+
 use crate::DocsSchema;
 use crate::plugin::{BUILTIN_SRC, BuiltinJsonPlugin, DocsSchemaPlugin, FileJsonPlugin};
 use std::path::Path;
@@ -33,6 +35,7 @@ impl SchemaRegistry {
         r
     }
 
+    /// Adds a schema provider to the registry.
     pub fn register(&mut self, plugin: Box<dyn DocsSchemaPlugin>) {
         self.plugins.push(plugin);
     }
@@ -45,6 +48,7 @@ impl SchemaRegistry {
             .map(|p| p.load())
     }
 
+    /// Returns provider names in registration order.
     pub fn names(&self) -> Vec<&str> {
         self.plugins.iter().map(|p| p.name()).collect()
     }
@@ -56,9 +60,7 @@ impl Default for SchemaRegistry {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

@@ -117,7 +117,7 @@ rules = ["claude/settings/broad-read"]
 
 ### CLI
 
-```
+```text
 agentlint [--difficulty easy|hard|painful] [--format gnu|json] [paths...]
 ```
 
@@ -128,7 +128,7 @@ When config is absent, default is `strict`.
 
 GNU format gains the rule ID:
 
-```
+```text
 .claude/settings.json:1:1: warning[claude/settings/broad-read]: ...
 ```
 

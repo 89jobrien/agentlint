@@ -10,7 +10,7 @@ harness file formats.
 
 Layer stack (lowest to highest):
 
-```
+```text
 agentlint (bin)               — composition root
 agentlint-{claude,cursor,...} — adapters, one struct per file-type concern
 agentlint-frontmatter         — shared YAML frontmatter parser utility
@@ -121,7 +121,7 @@ pub use agentlint_frontmatter::{Field, ParseError, check_required, parse};
 
 7. Verify:
 
-```
+```text
 cargo nextest run --workspace    → all green (frontmatter tests now in agentlint-frontmatter)
 cargo clippy --workspace -- -D warnings  → zero warnings
 ```
@@ -244,7 +244,7 @@ impl Validator for CursorValidator {
 
 4. Verify:
 
-```
+```text
 cargo nextest run -p agentlint-cursor    → all green
 cargo clippy -p agentlint-cursor -- -D warnings  → zero warnings
 ```
@@ -324,7 +324,7 @@ impl Validator for CodexValidator {
 
 3. Verify:
 
-```
+```text
 cargo nextest run -p agentlint-codex    → all green
 cargo clippy -p agentlint-codex -- -D warnings  → zero warnings
 ```
@@ -404,7 +404,7 @@ impl Validator for GeminiValidator {
 
 3. Verify:
 
-```
+```text
 cargo nextest run -p agentlint-gemini    → all green
 cargo clippy -p agentlint-gemini -- -D warnings  → zero warnings
 ```
@@ -491,7 +491,7 @@ impl Validator for PiValidator {
 
 3. Verify:
 
-```
+```text
 cargo nextest run -p agentlint-pi    → all green
 cargo clippy -p agentlint-pi -- -D warnings  → zero warnings
 ```
@@ -636,7 +636,7 @@ Box::new(agentlint_opencode::OpenCodeJsonValidator),
 
 5. Verify:
 
-```
+```text
 cargo nextest run -p agentlint-opencode    → all green
 cargo check -p agentlint                  → no errors
 cargo clippy --workspace -- -D warnings   → zero warnings
@@ -654,7 +654,7 @@ cargo clippy --workspace -- -D warnings   → zero warnings
 
 After all prior tasks are committed, verify the full workspace is green:
 
-```
+```text
 cargo nextest run --workspace
 cargo clippy --workspace -- -D warnings
 git push
@@ -664,7 +664,7 @@ git push
 
 ## Dependency order
 
-```
+```text
 Task 0 (frontmatter crate) ──► Task 1 (cursor)
                             ──► Task 5 (opencode) — independent of Task 1
 

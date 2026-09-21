@@ -1,8 +1,37 @@
 project: agentlint
 id: agentlint
-updated: 2026-05-20
-items: []
+updated: 2026-09-06
+items:
+  - id: declarative-consolidation-phase-1
+    title: Infrastructure for behavioral checks and declarative custom checks
+    status: in_progress
+    notes: "BatchCheck, behavioral modules, registry scaffolding, and the custom check type exist; the registry is empty and BatchCheck is not wired into the runner."
+  - id: declarative-consolidation-phase-2
+    title: Move behavioral logic into agentlint-core
+    status: in_progress
+    notes: "Claude, Cursor, and Looprs logic and tests have moved into core, but Validator::validate_batch remains and no BatchCheck implementation exists."
+  - id: declarative-consolidation-phase-3
+    title: Add custom behavioral rules to TOML plugins
+    status: pending
+    notes: "No plugin TOML currently contains check = \"custom\" or custom_fn."
+  - id: declarative-consolidation-phase-4
+    title: Delete seven per-agent crates
+    status: implemented_uncommitted
+    notes: "The seven crate trees are deleted from the worktree and their workspace/dependency entries are removed."
+  - id: declarative-consolidation-phase-5
+    title: Update binary, tests, plugins, and xtask wiring
+    status: in_progress
+    notes: "Main/test wiring, plugin build-time discovery, change detection, and publish order are changed; completion depends on the unfinished registry and batch migration."
+  - id: declarative-consolidation-verification
+    title: Complete consolidation verification checklist
+    status: in_progress
+    notes: "cargo nextest run --workspace passed 339/339 on 2026-09-06; cargo check, clippy, runtime repository validation, and diagnostic parity were not run in this handoff session."
 log:
+  - date: 2026-09-06
+    summary: "Uncommitted declarative consolidation is in progress: seven per-agent crates removed, behavioral code moved into core, and 339/339 workspace tests pass; custom plugin dispatch and BatchCheck migration remain incomplete."
+    commits:
+      - "12 commits after a16f0f5, the latest commit touching this handoff YAML (counted with git rev-list --count a16f0f5..HEAD)"
+    session: 7
   - date: null
     summary: "shipped v0.5.0: gemini/pi/opencode structural coverage — no-heading, too-sparse, no-commands-section (#51 #52 #53); 257 tests passing"
     commits: []

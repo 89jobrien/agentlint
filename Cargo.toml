@@ -2,14 +2,7 @@
 members = [
     "crates/agentlint-core",
     "crates/agentlint-frontmatter",
-    "crates/agentlint-claude",
-    "crates/agentlint-cursor",
-    "crates/agentlint-codex",
-    "crates/agentlint-opencode",
-    "crates/agentlint-gemini",
-    "crates/agentlint-pi",
     "crates/agentlint-docs",
-    "crates/agentlint-looprs",
     "crates/agentlint-plugins",
     "xtask",
 ]
@@ -27,14 +20,7 @@ publish = true
 # Internal crates
 agentlint-core        = { path = "crates/agentlint-core",        version = "0.6.0" }
 agentlint-frontmatter = { path = "crates/agentlint-frontmatter", version = "0.6.0" }
-agentlint-claude      = { path = "crates/agentlint-claude",      version = "0.6.0" }
-agentlint-cursor      = { path = "crates/agentlint-cursor",      version = "0.6.0" }
-agentlint-codex       = { path = "crates/agentlint-codex",       version = "0.6.0" }
-agentlint-opencode    = { path = "crates/agentlint-opencode",    version = "0.6.0" }
-agentlint-gemini      = { path = "crates/agentlint-gemini",      version = "0.6.0" }
-agentlint-pi          = { path = "crates/agentlint-pi",          version = "0.6.0" }
 agentlint-docs        = { path = "crates/agentlint-docs",        version = "0.6.0" }
-agentlint-looprs      = { path = "crates/agentlint-looprs",      version = "0.6.0" }
 agentlint-plugins     = { path = "crates/agentlint-plugins",     version = "0.6.0" }
 # External shared deps
 clap       = { version = "4",   features = ["derive"] }
@@ -63,14 +49,7 @@ path = "src/main.rs"
 
 [dependencies]
 agentlint-core     = { workspace = true, features = ["config", "declarative"] }
-agentlint-claude   = { workspace = true }
-agentlint-cursor   = { workspace = true }
-agentlint-codex    = { workspace = true }
-agentlint-opencode = { workspace = true }
-agentlint-gemini   = { workspace = true }
-agentlint-pi       = { workspace = true }
 agentlint-docs     = { workspace = true }
-agentlint-looprs   = { workspace = true }
 agentlint-plugins  = { workspace = true }
 clap               = { workspace = true }
 clap_complete      = "4"
@@ -80,11 +59,4 @@ walkdir            = { workspace = true }
 
 [dev-dependencies]
 agentlint-core     = { workspace = true, features = ["test-utils"] }
-agentlint-claude   = { workspace = true }
-agentlint-cursor   = { workspace = true }
-agentlint-codex    = { workspace = true }
-agentlint-opencode = { workspace = true }
-agentlint-gemini   = { workspace = true }
-agentlint-pi       = { workspace = true }
-agentlint-looprs   = { workspace = true }
 tempfile           = { workspace = true }

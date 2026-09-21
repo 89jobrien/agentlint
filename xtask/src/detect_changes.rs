@@ -7,7 +7,6 @@
 //! ```text
 //! core=true
 //! frontmatter=false
-//! claude=true
 //! ...
 //! ```
 
@@ -15,38 +14,26 @@ use anyhow::{Context, Result};
 use std::path::Path;
 use xshell::{Shell, cmd};
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Area {
     Core,
     Frontmatter,
-    Claude,
-    Cursor,
-    Codex,
-    Gemini,
-    Pi,
-    Opencode,
     Xtask,
     Docs,
     Workflows,
+    Plugins,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct ChangeSet {
     pub core: bool,
     pub frontmatter: bool,
-    pub claude: bool,
-    pub cursor: bool,
-    pub codex: bool,
-    pub gemini: bool,
-    pub pi: bool,
-    pub opencode: bool,
     pub xtask: bool,
     pub docs: bool,
     pub workflows: bool,
+    pub plugins: bool,
 }
 
 impl ChangeSet {
@@ -54,22 +41,15 @@ impl ChangeSet {
         match area {
             Area::Core => self.core = true,
             Area::Frontmatter => self.frontmatter = true,
-            Area::Claude => self.claude = true,
-            Area::Cursor => self.cursor = true,
-            Area::Codex => self.codex = true,
-            Area::Gemini => self.gemini = true,
-            Area::Pi => self.pi = true,
-            Area::Opencode => self.opencode = true,
             Area::Xtask => self.xtask = true,
             Area::Docs => self.docs = true,
             Area::Workflows => self.workflows = true,
+            Area::Plugins => self.plugins = true,
         }
     }
 }
 
-// ---------------------------------------------------------------------------
 // Path classifier
-// ---------------------------------------------------------------------------
 
 /// Map a changed file path (relative to workspace root) to a workspace area.
 ///
@@ -79,18 +59,8 @@ pub fn classify_path(path: &str) -> Option<Area> {
         Some(Area::Core)
     } else if path.starts_with("crates/agentlint-frontmatter/") {
         Some(Area::Frontmatter)
-    } else if path.starts_with("crates/agentlint-claude/") {
-        Some(Area::Claude)
-    } else if path.starts_with("crates/agentlint-cursor/") {
-        Some(Area::Cursor)
-    } else if path.starts_with("crates/agentlint-codex/") {
-        Some(Area::Codex)
-    } else if path.starts_with("crates/agentlint-gemini/") {
-        Some(Area::Gemini)
-    } else if path.starts_with("crates/agentlint-pi/") {
-        Some(Area::Pi)
-    } else if path.starts_with("crates/agentlint-opencode/") {
-        Some(Area::Opencode)
+    } else if path.starts_with("crates/agentlint-plugins/") || path.starts_with("plugins/") {
+        Some(Area::Plugins)
     } else if path.starts_with("xtask/") {
         Some(Area::Xtask)
     } else if path.starts_with("docs/") || (path.ends_with(".md") && !path.contains('/')) {
@@ -102,9 +72,7 @@ pub fn classify_path(path: &str) -> Option<Area> {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Public API
-// ---------------------------------------------------------------------------
 
 /// Run `git diff --name-only <base_ref>...HEAD` and classify changed paths.
 pub fn detect_changes(root: &Path, base_ref: &str) -> Result<ChangeSet> {
@@ -132,12 +100,7 @@ pub fn changeset_to_output_lines(cs: &ChangeSet) -> Vec<String> {
     vec![
         format!("core={}", cs.core),
         format!("frontmatter={}", cs.frontmatter),
-        format!("claude={}", cs.claude),
-        format!("cursor={}", cs.cursor),
-        format!("codex={}", cs.codex),
-        format!("gemini={}", cs.gemini),
-        format!("pi={}", cs.pi),
-        format!("opencode={}", cs.opencode),
+        format!("plugins={}", cs.plugins),
         format!("xtask={}", cs.xtask),
         format!("docs={}", cs.docs),
         format!("workflows={}", cs.workflows),
@@ -167,14 +130,13 @@ pub fn emit_gha_outputs(cs: &ChangeSet) -> Result<()> {
     Ok(())
 }
 
+/// Detects changed workspace areas and emits their GitHub Actions outputs.
 pub fn run(root: &Path, base_ref: &str) -> Result<()> {
     let cs = detect_changes(root, base_ref)?;
     emit_gha_outputs(&cs)
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -203,51 +165,12 @@ mod tests {
     }
 
     #[test]
-    fn classify_claude() {
+    fn classify_plugins() {
         assert_eq!(
-            classify_path("crates/agentlint-claude/src/agents.rs"),
-            Some(Area::Claude)
+            classify_path("crates/agentlint-plugins/src/lib.rs"),
+            Some(Area::Plugins)
         );
-    }
-
-    #[test]
-    fn classify_cursor() {
-        assert_eq!(
-            classify_path("crates/agentlint-cursor/src/lib.rs"),
-            Some(Area::Cursor)
-        );
-    }
-
-    #[test]
-    fn classify_codex() {
-        assert_eq!(
-            classify_path("crates/agentlint-codex/src/lib.rs"),
-            Some(Area::Codex)
-        );
-    }
-
-    #[test]
-    fn classify_gemini() {
-        assert_eq!(
-            classify_path("crates/agentlint-gemini/src/lib.rs"),
-            Some(Area::Gemini)
-        );
-    }
-
-    #[test]
-    fn classify_pi() {
-        assert_eq!(
-            classify_path("crates/agentlint-pi/src/lib.rs"),
-            Some(Area::Pi)
-        );
-    }
-
-    #[test]
-    fn classify_opencode() {
-        assert_eq!(
-            classify_path("crates/agentlint-opencode/src/lib.rs"),
-            Some(Area::Opencode)
-        );
+        assert_eq!(classify_path("plugins/claude.toml"), Some(Area::Plugins));
     }
 
     #[test]
@@ -288,7 +211,7 @@ mod tests {
     fn changeset_folds_multiple_paths() {
         let paths = [
             "crates/agentlint-core/src/lib.rs",
-            "crates/agentlint-claude/src/agents.rs",
+            "plugins/claude.toml",
             "docs/plans/2026-05-15-agentlint.md",
         ];
         let mut cs = ChangeSet::default();
@@ -298,9 +221,8 @@ mod tests {
             }
         }
         assert!(cs.core);
-        assert!(cs.claude);
+        assert!(cs.plugins);
         assert!(cs.docs);
-        assert!(!cs.cursor);
         assert!(!cs.frontmatter);
     }
 
@@ -308,21 +230,16 @@ mod tests {
     fn emit_outputs_formats_correctly() {
         let cs = ChangeSet {
             core: true,
-            claude: true,
             frontmatter: false,
-            cursor: false,
-            codex: false,
-            gemini: false,
-            pi: false,
-            opencode: false,
+            plugins: true,
             xtask: false,
             docs: false,
             workflows: false,
         };
         let lines = changeset_to_output_lines(&cs);
         assert!(lines.contains(&"core=true".to_string()));
-        assert!(lines.contains(&"claude=true".to_string()));
-        assert!(lines.contains(&"cursor=false".to_string()));
+        assert!(lines.contains(&"plugins=true".to_string()));
+        assert!(lines.contains(&"frontmatter=false".to_string()));
     }
 
     #[test]
@@ -359,7 +276,6 @@ mod tests {
         let cs = detect_changes(root, "HEAD^").expect("detect_changes");
         assert!(cs.core, "core should be true");
         assert!(cs.docs, "docs should be true");
-        assert!(!cs.claude, "claude should be false");
-        assert!(!cs.cursor, "cursor should be false");
+        assert!(!cs.frontmatter, "frontmatter should be false");
     }
 }

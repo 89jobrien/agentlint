@@ -1,0 +1,152 @@
+# Declarative plugin: maestro feature-centric documentation structure validator
+# Validates the docs/ tree follows the feature/use-case/research conventions
+# defined in docs/guides/documentation-structure.md.
+
+[plugin]
+name = "maestro-docs"
+prefix = "maestro-docs"
+
+# --- Feature documentation (docs/features/[name]/*.md) ---
+
+[[validator]]
+id = "features"
+patterns = ["docs/features/**/*.md"]
+format = "markdown"
+skip_filenames = ["README.md"]
+
+[[validator.rules]]
+id = "maestro-docs/features/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "feature doc is empty"
+
+[[validator.rules]]
+id = "maestro-docs/features/no-heading"
+check = "has-heading"
+severity = "error"
+difficulty = "easy"
+message = "feature doc has no markdown heading"
+
+[[validator.rules]]
+id = "maestro-docs/features/too-short"
+check = "min-content"
+min_lines = 3
+min_chars = 60
+severity = "warning"
+difficulty = "painful"
+message = "feature doc has very little content"
+
+[[validator.rules]]
+id = "maestro-docs/features/too-long"
+check = "max-lines"
+max = 800
+severity = "warning"
+difficulty = "painful"
+message = "feature doc exceeds 800 lines; consider splitting"
+
+# --- Use-case documentation (docs/use-cases/[name]/*.md) ---
+
+[[validator]]
+id = "use-cases"
+patterns = ["docs/use-cases/**/*.md"]
+format = "markdown"
+skip_filenames = ["README.md"]
+
+[[validator.rules]]
+id = "maestro-docs/use-cases/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "use-case doc is empty"
+
+[[validator.rules]]
+id = "maestro-docs/use-cases/no-heading"
+check = "has-heading"
+severity = "error"
+difficulty = "easy"
+message = "use-case doc has no markdown heading"
+
+[[validator.rules]]
+id = "maestro-docs/use-cases/too-short"
+check = "min-content"
+min_lines = 3
+min_chars = 60
+severity = "warning"
+difficulty = "painful"
+message = "use-case doc has very little content"
+
+# --- Research documentation (docs/research/[name]/*.md) ---
+
+[[validator]]
+id = "research"
+patterns = ["docs/research/**/*.md"]
+format = "markdown"
+skip_filenames = ["README.md"]
+
+[[validator.rules]]
+id = "maestro-docs/research/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "research doc is empty"
+
+[[validator.rules]]
+id = "maestro-docs/research/no-heading"
+check = "has-heading"
+severity = "error"
+difficulty = "easy"
+message = "research doc has no markdown heading"
+
+[[validator.rules]]
+id = "maestro-docs/research/too-short"
+check = "min-content"
+min_lines = 3
+min_chars = 60
+severity = "warning"
+difficulty = "painful"
+message = "research doc has very little content"
+
+# --- Architecture docs (docs/architecture/**/*.md) ---
+
+[[validator]]
+id = "architecture"
+patterns = ["docs/architecture/**/*.md"]
+format = "markdown"
+skip_filenames = ["README.md"]
+
+[[validator.rules]]
+id = "maestro-docs/architecture/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "architecture doc is empty"
+
+[[validator.rules]]
+id = "maestro-docs/architecture/no-heading"
+check = "has-heading"
+severity = "error"
+difficulty = "easy"
+message = "architecture doc has no markdown heading"
+
+# --- Guides (docs/guides/**/*.md) ---
+
+[[validator]]
+id = "guides"
+patterns = ["docs/guides/**/*.md"]
+format = "markdown"
+skip_filenames = ["README.md"]
+
+[[validator.rules]]
+id = "maestro-docs/guides/empty"
+check = "non-empty"
+severity = "error"
+difficulty = "easy"
+message = "guide doc is empty"
+
+[[validator.rules]]
+id = "maestro-docs/guides/no-heading"
+check = "has-heading"
+severity = "error"
+difficulty = "easy"
+message = "guide doc has no markdown heading"

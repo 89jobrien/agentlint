@@ -9,15 +9,15 @@ meta:
   spec: docs/specs/2026-05-15-agentlint.spec.md
 ---
 
-# Plan: agentlint-docs plugin registry and schema inference engine
+## Plan: agentlint-docs plugin registry and schema inference engine
 
-## Goal
+### Goal
 
 Refactor `agentlint-docs` into a discoverable plugin engine: a `DocsSchemaPlugin` trait
 with a `SchemaRegistry` that loads built-in and filesystem-discovered JSON schemas, plus
 a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flags.
 
-## Architecture
+### Architecture
 
 - Crates affected: `agentlint-docs`, `agentlint` (binary)
 - New types:
@@ -30,15 +30,15 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
   - `--infer-schema`: corpus → `infer_schema()` → `DocsSchema` → per-file outlier diags
   - `--emit-schema`: corpus → `infer_schema()` → JSON → stdout → exit 0
 
-## Tech Stack
+### Tech Stack
 
 - Rust edition 2024; `serde`, `serde_json`, `serde_yaml`, `toml` (all existing)
 - No new crate dependencies
 - `validate_batch` hook on `Validator` trait (already exists in `agentlint-core`)
 
-## Tasks
+### Tasks
 
-### Task 1: Add `Serialize` to `DocsSchema` and `FilenameConvention`; expand default JSON
+#### Task 1: Add `Serialize` to `DocsSchema` and `FilenameConvention`; expand default JSON
 
 **Crate**: `agentlint-docs`
 **File(s)**:
@@ -153,7 +153,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 4. Verify:
 
-   ```
+   ```text
    cargo nextest run -p agentlint-docs    → all green
    cargo clippy -p agentlint-docs -- -D warnings  → zero warnings
    ```
@@ -164,7 +164,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 ---
 
-### Task 2: `DocsSchemaPlugin` trait + `BuiltinJsonPlugin` + `FileJsonPlugin`
+#### Task 2: `DocsSchemaPlugin` trait + `BuiltinJsonPlugin` + `FileJsonPlugin`
 
 **Crate**: `agentlint-docs`
 **File(s)**: `crates/agentlint-docs/src/plugin.rs`
@@ -270,7 +270,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 3. Verify:
 
-   ```
+   ```text
    cargo nextest run -p agentlint-docs    → all green
    cargo clippy -p agentlint-docs -- -D warnings  → zero warnings
    ```
@@ -281,7 +281,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 ---
 
-### Task 3: `SchemaRegistry` with built-in and filesystem discovery
+#### Task 3: `SchemaRegistry` with built-in and filesystem discovery
 
 **Crate**: `agentlint-docs`
 **File(s)**: `crates/agentlint-docs/src/registry.rs`
@@ -394,7 +394,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 3. Verify:
 
-   ```
+   ```text
    cargo nextest run -p agentlint-docs    → all green
    cargo clippy -p agentlint-docs -- -D warnings  → zero warnings
    ```
@@ -405,7 +405,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 ---
 
-### Task 4: Corpus inference — `infer_schema()`
+#### Task 4: Corpus inference — `infer_schema()`
 
 **Crate**: `agentlint-docs`
 **File(s)**: `crates/agentlint-docs/src/infer.rs`
@@ -634,7 +634,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 3. Verify:
 
-   ```
+   ```text
    cargo nextest run -p agentlint-docs    → all green
    cargo clippy -p agentlint-docs -- -D warnings  → zero warnings
    ```
@@ -645,7 +645,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 ---
 
-### Task 5: Wire infer mode into `DocsValidator`
+#### Task 5: Wire infer mode into `DocsValidator`
 
 **Crate**: `agentlint-docs`
 **File(s)**: `crates/agentlint-docs/src/lib.rs`
@@ -741,7 +741,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 3. Verify:
 
-   ```
+   ```text
    cargo nextest run -p agentlint-docs    → all green
    cargo clippy -p agentlint-docs -- -D warnings  → zero warnings
    ```
@@ -752,7 +752,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 ---
 
-### Task 6: `--infer-schema` and `--emit-schema` CLI flags
+#### Task 6: `--infer-schema` and `--emit-schema` CLI flags
 
 **Crate**: `agentlint` (binary)
 **File(s)**: `src/main.rs`
@@ -861,7 +861,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 3. Verify:
 
-   ```
+   ```text
    cargo nextest run --workspace    → all green
    cargo clippy --workspace -- -D warnings  → zero warnings
    cargo run -- --emit-schema 2>/dev/null   → prints JSON object
@@ -873,7 +873,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 ---
 
-### Task 7: Wire `SchemaRegistry` into `DocsSchema::from_config_path` and update example config
+#### Task 7: Wire `SchemaRegistry` into `DocsSchema::from_config_path` and update example config
 
 **Crate**: `agentlint-docs`, docs
 **File(s)**:
@@ -998,7 +998,7 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 4. Verify:
 
-   ```
+   ```text
    cargo nextest run -p agentlint-docs    → all green
    cargo clippy -p agentlint-docs -- -D warnings  → zero warnings
    ```
@@ -1009,14 +1009,14 @@ a corpus-inference pass triggered by `--infer-schema` / `--emit-schema` CLI flag
 
 ---
 
-## Quality Rules
+### Quality Rules
 
 - No placeholders: all code blocks are copy-paste ready
 - Each task ends with a `cargo nextest` pass and a commit
 - `validate_batch` is the inference boundary — no runner changes needed in `agentlint-core`
 - `--emit-schema` does not run validation; it exits after printing JSON
 
-## Pre-Save Checklist
+### Pre-Save Checklist
 
 - [x] All 7 tasks map to distinct files with zero overlap
 - [x] Type names consistent across tasks: `DocsSchemaPlugin`, `SchemaRegistry`, `infer_schema`

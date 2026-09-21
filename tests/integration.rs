@@ -4,27 +4,26 @@
 use std::fs;
 use std::path::PathBuf;
 
+use agentlint_core::behavioral::{claude, cursor, looprs};
 use agentlint_core::{RunConfig, Validator, run};
 use tempfile::TempDir;
 
-/// Assemble the same native validators as main.rs (minus docs and plugins).
+/// Assemble the same native validators as main.rs (minus docs).
 fn validators() -> Vec<Box<dyn Validator>> {
-    vec![
-        Box::new(agentlint_claude::ClaudeValidator),
-        Box::new(agentlint_cursor::CursorValidator),
-        Box::new(agentlint_codex::CodexValidator),
-        Box::new(agentlint_opencode::AgentsMarkdownValidator),
-        Box::new(agentlint_opencode::OpenCodeJsonValidator),
-        Box::new(agentlint_gemini::GeminiValidator),
-        Box::new(agentlint_pi::PiValidator),
-        Box::new(agentlint_looprs::CommandsValidator),
-        Box::new(agentlint_looprs::HooksValidator),
-        Box::new(agentlint_looprs::SkillsValidator),
-        Box::new(agentlint_looprs::AgentsValidator),
-        Box::new(agentlint_looprs::RulesValidator),
-        Box::new(agentlint_looprs::ConfigValidator),
-        Box::new(agentlint_looprs::AgentJsonValidator),
-    ]
+    let mut v: Vec<Box<dyn Validator>> = vec![
+        Box::new(claude::ClaudeValidator),
+        Box::new(cursor::CursorValidator),
+        Box::new(looprs::CommandsValidator),
+        Box::new(looprs::HooksValidator),
+        Box::new(looprs::SkillsValidator),
+        Box::new(looprs::AgentsValidator),
+        Box::new(looprs::RulesValidator),
+        Box::new(looprs::ConfigValidator),
+        Box::new(looprs::AgentJsonValidator),
+    ];
+    // Include declarative plugin validators (codex, gemini, pi, opencode, etc.)
+    v.extend(agentlint_plugins::all_validators());
+    v
 }
 
 /// Substantive markdown content that passes the min-lines / min-chars / heading
@@ -68,9 +67,7 @@ Follow these rules when editing code.
 /// Valid opencode.json content.
 const VALID_OPENCODE_JSON: &str = r#"{"model": "gpt-4"}"#;
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 #[test]
 fn all_valid_files_produce_zero_diagnostics() {
@@ -156,8 +153,6 @@ fn binary_file_in_matched_path_is_skipped() {
     let config = RunConfig::default();
     let result = run(&[PathBuf::from(root)], &validators, &config);
 
-    // Binary file should either be skipped entirely or produce a read-error
-    // diagnostic — but NOT a validator panic.
     let has_validator_panic = result
         .diagnostics
         .iter()

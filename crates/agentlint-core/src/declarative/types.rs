@@ -65,6 +65,9 @@ pub struct RuleDef {
     /// Minimum non-whitespace characters for `min-content` check.
     #[serde(default)]
     pub min_chars: Option<usize>,
+    /// Name of the behavioral function in the registry.
+    #[serde(default)]
+    pub custom_fn: Option<String>,
 }
 
 fn default_severity() -> SeverityDef {
@@ -111,6 +114,7 @@ pub enum Check {
     ArrayNonEmpty,
     IsObject,
     KnownKeys,
+    Custom,
 }
 
 /// Values can be inline strings or a `$constant_name` reference.

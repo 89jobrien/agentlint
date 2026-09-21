@@ -35,7 +35,7 @@ simplified shortcuts for common operations.
 
 ## Workspace Layout
 
-```
+```text
 agentlint/
 ├── src/main.rs              # CLI entry point (thin wrapper)
 ├── crates/
@@ -79,7 +79,7 @@ agentlint/
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
-```
+```text
 <type>(<scope>): <description>
 ```
 

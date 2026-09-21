@@ -2,37 +2,21 @@
 //! contract. One central location instead of per-crate boilerplate.
 
 use agentlint_core::Validator;
+use agentlint_core::behavioral::{claude, cursor, looprs};
 use agentlint_core::testing::{assert_validator_contract, assert_validator_rejects_empty};
 
 /// Build the full list of native validators (mirrors main.rs assembly).
 fn all_validators() -> Vec<(&'static str, Box<dyn Validator>)> {
     let mut v: Vec<(&str, Box<dyn Validator>)> = vec![
-        ("claude", Box::new(agentlint_claude::ClaudeValidator)),
-        ("cursor", Box::new(agentlint_cursor::CursorValidator)),
-        ("codex", Box::new(agentlint_codex::CodexValidator)),
-        (
-            "opencode/agents",
-            Box::new(agentlint_opencode::AgentsMarkdownValidator),
-        ),
-        (
-            "opencode/json",
-            Box::new(agentlint_opencode::OpenCodeJsonValidator),
-        ),
-        ("gemini", Box::new(agentlint_gemini::GeminiValidator)),
-        ("pi", Box::new(agentlint_pi::PiValidator)),
-        (
-            "looprs/commands",
-            Box::new(agentlint_looprs::CommandsValidator),
-        ),
-        ("looprs/hooks", Box::new(agentlint_looprs::HooksValidator)),
-        ("looprs/skills", Box::new(agentlint_looprs::SkillsValidator)),
-        ("looprs/agents", Box::new(agentlint_looprs::AgentsValidator)),
-        ("looprs/rules", Box::new(agentlint_looprs::RulesValidator)),
-        ("looprs/config", Box::new(agentlint_looprs::ConfigValidator)),
-        (
-            "looprs/agent-json",
-            Box::new(agentlint_looprs::AgentJsonValidator),
-        ),
+        ("claude", Box::new(claude::ClaudeValidator)),
+        ("cursor", Box::new(cursor::CursorValidator)),
+        ("looprs/commands", Box::new(looprs::CommandsValidator)),
+        ("looprs/hooks", Box::new(looprs::HooksValidator)),
+        ("looprs/skills", Box::new(looprs::SkillsValidator)),
+        ("looprs/agents", Box::new(looprs::AgentsValidator)),
+        ("looprs/rules", Box::new(looprs::RulesValidator)),
+        ("looprs/config", Box::new(looprs::ConfigValidator)),
+        ("looprs/agent-json", Box::new(looprs::AgentJsonValidator)),
     ];
 
     // Declarative (TOML-based) validators.
@@ -46,7 +30,6 @@ fn all_validators() -> Vec<(&'static str, Box<dyn Validator>)> {
 #[test]
 fn all_validators_satisfy_contract() {
     for (label, validator) in all_validators() {
-        // Wrap panics so we know which validator failed.
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             assert_validator_contract(validator.as_ref());
         }));
@@ -64,24 +47,10 @@ fn all_validators_satisfy_contract() {
 /// Validators that must reject empty files.
 #[test]
 fn rejects_empty_files() {
-    let cases: Vec<(&str, Box<dyn Validator>)> = vec![
-        ("claude", Box::new(agentlint_claude::ClaudeValidator)),
-        ("codex", Box::new(agentlint_codex::CodexValidator)),
-        ("gemini", Box::new(agentlint_gemini::GeminiValidator)),
-        ("pi", Box::new(agentlint_pi::PiValidator)),
-        (
-            "opencode/agents",
-            Box::new(agentlint_opencode::AgentsMarkdownValidator),
-        ),
-    ];
+    let cases: Vec<(&str, Box<dyn Validator>)> =
+        vec![("claude", Box::new(claude::ClaudeValidator))];
 
-    let filenames: &[(&str, &str)] = &[
-        ("claude", ".claude/agents/test.md"),
-        ("codex", "AGENTS.md"),
-        ("gemini", "GEMINI.md"),
-        ("pi", "AGENTS.md"),
-        ("opencode/agents", "AGENTS.md"),
-    ];
+    let filenames: &[(&str, &str)] = &[("claude", ".claude/agents/test.md")];
 
     for (label, validator) in &cases {
         let filename = filenames

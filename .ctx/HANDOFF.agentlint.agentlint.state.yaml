@@ -1,10 +1,43 @@
 branch: main
-build: passing
-tests: "257/257"
-notes: "v0.5.0 tagged and pushed; all validators at structural parity"
+build: not_run
+tests: "339 passed, 0 failed, 0 skipped (cargo nextest run --workspace, 2026-09-06)"
+notes: "Large uncommitted declarative-consolidation worktree; agentlint governed lint action reported 0 errors and 0 warnings across 13 harness files."
+commits_since_last_handoff:
+  count: 12
+  basis: "git rev-list --count a16f0f573e0743ebb79e995008122572f3df5738..HEAD; a16f0f5 is the latest commit touching HANDOFF.agentlint.agentlint.yaml"
+versions_touched:
+  project: "0.6.0 (unchanged; references for deleted crates removed from Cargo.toml/Cargo.lock)"
+  clap_complete: "4.6.8 added to Cargo.lock"
+  clap_complete_nushell: "4.6.1 added to Cargo.lock"
+registered_tasks:
+  - id: t1
+    status: done
+  - id: t2
+    status: done
+  - id: t3
+    status: done
+  - id: t4
+    status: done
+  - id: t5
+    status: done
+  - id: t6
+    status: done
 touched_files:
-  - crates/agentlint-gemini/src/lib.rs
-  - crates/agentlint-pi/src/lib.rs
-  - crates/agentlint-opencode/src/lib.rs
+  - CLAUDE.md
   - Cargo.toml
   - Cargo.lock
+  - crates/agentlint-core/
+  - crates/agentlint-plugins/
+  - crates/agentlint-claude/ (deleted)
+  - crates/agentlint-cursor/ (deleted)
+  - crates/agentlint-codex/ (deleted)
+  - crates/agentlint-gemini/ (deleted)
+  - crates/agentlint-opencode/ (deleted)
+  - crates/agentlint-pi/ (deleted)
+  - crates/agentlint-looprs/ (deleted)
+  - plugins/agentlint.maestro-docs.toml
+  - src/main.rs
+  - tests/
+  - xtask/
+unrelated_untracked_preserved:
+  - .DS_Store

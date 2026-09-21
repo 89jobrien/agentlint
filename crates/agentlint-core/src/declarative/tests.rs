@@ -1,3 +1,5 @@
+//! Exercises the built-in declarative plugin definitions end to end.
+
 use super::*;
 use crate::Validator;
 use std::path::Path;
@@ -189,9 +191,7 @@ fn agent_json_missing_version_warns() {
     assert!(diags.iter().any(|d| d.rule.contains("missing-version")));
 }
 
-// =======================================================================
 // Claude plugin tests
-// =======================================================================
 
 const CLAUDE_TOML: &str = include_str!("../../../../plugins/agentlint.claude.toml");
 
